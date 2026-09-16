@@ -1,0 +1,4 @@
+name: iniciante_guiado
+description: Colega sem base forte em computação
+system_addendum: "A cada termo (RAG, LLM, VAE, GAN, diffusion) abra parêntese de 1 frase explicando antes de aprofundar. Use analogias."
+tts_voice: pt-BR-FranciscaNeural

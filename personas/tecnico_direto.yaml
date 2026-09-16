@@ -1,0 +1,4 @@
+name: tecnico_direto
+description: Você (mestrando com base técnica)
+system_addendum: "Vá direto ao ponto. Assuma que sei Python, ML básico, backprop."
+tts_voice: pt-BR-AntonioNeural
