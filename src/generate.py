@@ -55,9 +55,38 @@ def _key(*bits: str) -> str:
     return hashlib.sha256("|".join(bits).encode()).hexdigest()[:16]
 
 
+def chunk_sig_of(chunks: list[dict]) -> str:
+    return ",".join(sorted(c["doc_id"] for c in chunks))
+
+
+def get_pass1(query: str, scope: str, chunks: list[dict], macro: str | None,
+              addendum: str, use_cache: bool = True) -> tuple[str, str, bool]:
+    """Retorna (texto, provider, cached). Com use_cache=False, sempre chama o LLM (mas escreve o cache)."""
+    h1 = _key(PROMPT_VERSION, "pass1", scope, query, chunk_sig_of(chunks))
+    p1_path = CACHE / f"pass1_{h1}.md"
+    if use_cache and p1_path.exists():
+        return p1_path.read_text(encoding="utf-8"), "cache", True
+    text, provider = complete_with_fallback(
+        pass1_system(addendum), pass1_user(query, chunks, macro))
+    p1_path.write_text(text, encoding="utf-8")
+    return text, provider, False
+
+
+def get_pass2(query: str, scope: str, persona: str, pass1_text: str,
+              chunk_sig: str, use_cache: bool = True) -> tuple[str, str, bool]:
+    h2 = _key(PROMPT_VERSION, "pass2", persona, scope, query, chunk_sig)
+    p2_path = CACHE / f"pass2_{persona}_{h2}.md"
+    if use_cache and p2_path.exists():
+        return p2_path.read_text(encoding="utf-8"), "cache", True
+    system2, user2 = pass2_prompt(pass1_text, persona)
+    text, provider = complete_with_fallback(system2, user2)
+    p2_path.write_text(text, encoding="utf-8")
+    return text, provider, False
+
+
 def answer(query: str, chapter: int | None, persona: str = "tecnico_direto",
            store: RAGStore | None = None, reranker: Reranker | None = None,
-           macro: str | None = None) -> dict:
+           macro: str | None = None, use_cache: bool = True) -> dict:
     """Pipeline S3: retrieve top-5 -> Pass1 (cache) -> Pass2 (cache)."""
     store = store or RAGStore()
     reranker = reranker or Reranker()
@@ -66,30 +95,11 @@ def answer(query: str, chapter: int | None, persona: str = "tecnico_direto",
         raise ValueError("Nada recuperado neste escopo — tente 'Livro todo'.")
 
     CACHE.mkdir(parents=True, exist_ok=True)
-    chunk_sig = ",".join(sorted(c["doc_id"] for c in chunks))
     scope = str(chapter) if chapter is not None else "all"
-    h1 = _key(PROMPT_VERSION, "pass1", scope, query, chunk_sig)
-    h2 = _key(PROMPT_VERSION, "pass2", persona, scope, query, chunk_sig)
-    p1_path, p2_path = CACHE / f"pass1_{h1}.md", CACHE / f"pass2_{persona}_{h2}.md"
-
+    sig = chunk_sig_of(chunks)
     addendum = load_persona(persona).get("system_addendum", "")
-    provider = "cache"
-    if p1_path.exists() and p2_path.exists():
-        return {"pass1": p1_path.read_text(encoding="utf-8"),
-                "pass2": p2_path.read_text(encoding="utf-8"),
-                "chunks": chunks, "provider": provider, "cached": True}
-
-    if not p1_path.exists():
-        text1, provider = complete_with_fallback(
-            pass1_system(addendum), pass1_user(query, chunks, macro))
-        p1_path.write_text(text1, encoding="utf-8")
-    else:
-        text1 = p1_path.read_text(encoding="utf-8")
-    if not p2_path.exists():
-        system2, user2 = pass2_prompt(text1, persona)
-        text2, provider = complete_with_fallback(system2, user2)
-        p2_path.write_text(text2, encoding="utf-8")
-    else:
-        text2 = p2_path.read_text(encoding="utf-8")
+    text1, prov1, cached1 = get_pass1(query, scope, chunks, macro, addendum, use_cache)
+    text2, prov2, cached2 = get_pass2(query, scope, persona, text1, sig, use_cache)
+    provider = prov1 if prov1 != "cache" else prov2
     return {"pass1": text1, "pass2": text2, "chunks": chunks,
-            "provider": provider, "cached": False}
+            "provider": provider, "cached": cached1 and cached2}

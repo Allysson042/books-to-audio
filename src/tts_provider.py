@@ -40,12 +40,13 @@ def clean_for_speech(text: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
-async def synth_edge(text: str, voice: str = "pt-BR-FranciscaNeural") -> Path:
+async def synth_edge(text: str, voice: str = "pt-BR-FranciscaNeural",
+                   use_cache: bool = True) -> Path:
     """Edge-TTS (online, primário). Retorna MP3 do cache ou sintetiza."""
     import edge_tts
     key = _key(text, voice)
     out = CACHE / f"{key}.mp3"
-    if out.exists():
+    if use_cache and out.exists():
         return out
     comm = edge_tts.Communicate(clean_for_speech(text), voice)
     await comm.save(str(out))
@@ -57,14 +58,14 @@ async def synth_edge(text: str, voice: str = "pt-BR-FranciscaNeural") -> Path:
 
 
 def synth_piper(text: str, voice: str = "pt-BR-FranciscaNeural",
-                model_path: str = "pt_BR-faber-medium") -> Path:
+                model_path: str = "pt_BR-faber-medium", use_cache: bool = True) -> Path:
     """Piper local (offline, fallback). Exige binário `piper` + modelo no PATH/dir."""
     if not shutil.which("piper"):
         raise RuntimeError("Piper não instalado (binário `piper` ausente). "
                            "Instale p/ fallback offline ou use Edge-TTS online.")
     key = _key(text, voice)
     out = CACHE / f"{key}.mp3"
-    if out.exists():
+    if use_cache and out.exists():
         return out
     plain = clean_for_speech(text)
     # piper gera wav no stdout -> convertemos p/ mp3 se ffmpeg existir, senão wav
@@ -79,17 +80,18 @@ def synth_piper(text: str, voice: str = "pt-BR-FranciscaNeural",
     return wav
 
 
-def synthesize(text: str, voice: str = "pt-BR-FranciscaNeural") -> tuple[Path, str]:
+def synthesize(text: str, voice: str = "pt-BR-FranciscaNeural",
+               use_cache: bool = True) -> tuple[Path, str]:
     """Caminho sync p/ o app: Edge-TTS, com Piper como fallback. Retorna (mp3, engine)."""
     key = _key(text, voice)
     out = CACHE / f"{key}.mp3"
-    if out.exists():
+    if use_cache and out.exists():
         return out, "cache"
     try:
-        return asyncio.run(synth_edge(text, voice)), "edge-tts"
+        return asyncio.run(synth_edge(text, voice, use_cache)), "edge-tts"
     except Exception as e:
         try:
-            return synth_piper(text, voice), "piper"
+            return synth_piper(text, voice, use_cache=use_cache), "piper"
         except Exception:
             raise RuntimeError(f"Edge-TTS falhou ({str(e)[-200:]}) e Piper indisponível. "
                                f"Verifique a internet ou pré-gere o kit demo (S5).")

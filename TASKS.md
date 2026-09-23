@@ -38,9 +38,14 @@
 - [ ] Modo offline (serve cache se API falhar)
 - [ ] Polish: diagrama + métricas + vídeo backup
 
+## UI funcional (pós-S4) [x] — ver `anotations/ui-refactor.md`
+- [x] Chunks em expander colapsado + colunas Pass1/Pass2 sempre visíveis e independentes
+- [x] Toggle "Usar cache" (lê OFF, escreve sempre) + `get_pass1/get_pass2` + áudio na col Pass2
+
 ## Futuro (pós-seminário)
 - [ ] VLM para descrever figuras
 - [ ] Avaliação RAGAS, editor de persona, Qdrant
+- [ ] Vectorless (PageIndex-style) como 2ª estratégia com toggle — ver `anotations/vectorless-pageindex.md`
 
 ## Notas p/ futuras sessões (aprendizados 16/09 — não repetir erros)
 - **Query EN > PT no retrieval** (corpus e MiniLM são EN; resposta sai PT-BR de todo jeito). Otimização futura: traduzir query p/ EN antes de buscar. **Medir antes de mexer**: montar 3-5 perguntas douradas (pergunta + cap/pág esperados) e checar hit-rate top-5 em PT vs EN antes de rechunkar (rechunk = reembedar tudo).
