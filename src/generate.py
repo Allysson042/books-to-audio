@@ -19,7 +19,7 @@ from src.retrieval import RAGStore, Reranker
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "cache"
 PERSONAS = ROOT / "personas"
-PROMPT_VERSION = "v1"  # bump p/ invalidar todo o cache textual
+PROMPT_VERSION = "v2"  # bump p/ invalidar todo o cache textual
 CHUNK_CHARS = 1500    # truncagem por chunk no prompt (5 chunks ~= 7.5k chars)
 
 

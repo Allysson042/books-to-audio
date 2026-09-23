@@ -8,13 +8,36 @@ Sempre cite fontes como [Cap X, p. Y]. Se não estiver nos chunks, diga que não
 
 PASS1 = SYSTEM_BASE + "\nGere resumo técnico fiel e denso, com bullets e citações."
 
-PASS2_INICIANTE = """Reescreva o resumo abaixo em roteiro de áudio fluido 5-8min em PT-BR:
-- gancho 30s + 3 ideias-chave + 1 analogia + fechamento 'leia Cap X p. Y'.
-- Remova colchetes de citação da fala, fale 'conforme o capítulo 4'.
-- Para perfil iniciante, abra parênteses de 1 frase ao citar RAG, LLM, VAE, GAN.
-- Expanda siglas na fala (ex: 'V-A-E'). Mantenha termos EN intactos."""
+PASS2_INICIANTE = """Aja como um locutor gravando um monólogo contínuo e fluido de 5-8 minutos em PT-BR, baseado no resumo técnico fornecido.
 
-PASS2_TECNICO = """Reescreva o resumo abaixo em roteiro de áudio fluido 5-8min em PT-BR:
-- Direto ao ponto técnico, sem parênteses básicos.
-- Mesma estrutura: gancho + 3 ideias + exemplo de código/equação ditada + fechamento.
-- Remova colchetes da fala. Mantenha termos EN intactos."""
+ESTRUTURA DA FALA:
+- Comece com um gancho de 30 segundos.
+- Desenvolva as 3 ideias-chave usando 1 analogia didática.
+- Faça o fechamento convidando o ouvinte a consultar a fonte (ex: 'Para mais detalhes, confira o Capítulo X, página Y').
+- Integre as citações na própria fala de forma natural (não use colchetes, diga 'conforme o autor aponta no capítulo...').
+- Para este perfil iniciante, ao mencionar RAG, LLM, VAE ou GAN pela primeira vez, faça uma breve explicação em uma frase.
+- Expanda siglas para a pronúncia correta (ex: escreva 'V-A-E', 'L-L-M'). Mantenha os termos do glossário em inglês intactos.
+
+REGRAS RÍGIDAS DE FORMATAÇÃO (CRÍTICO PARA O SISTEMA DE VOZ):
+1. PROIBIDO usar marcações de roteiro. Não escreva 'Locutor:', '[Música]', '(pausa)', '[Suspiro]', etc.
+2. PROIBIDO usar formatação Markdown. Não use asteriscos (*), sublinhados (_), hashtags (#) ou hifens de lista (-).
+3. PROIBIDO adicionar introduções ou conclusões em texto (como "Aqui está o seu texto" ou "Espero que goste").
+4. Escreva APENAS o texto exato que será vocalizado, em parágrafos corridos. Use vírgulas e pontos finais para guiar a respiração e as pausas da voz.
+"""
+
+PASS2_TECNICO = """Aja como um locutor gravando um monólogo contínuo e fluido de 5-8 minutos em PT-BR, baseado no resumo técnico fornecido.
+
+ESTRUTURA DA FALA (Perfil Técnico Avançado):
+- Direto ao ponto técnico, sem explicações básicas de conceitos.
+- Comece com um gancho de 30 segundos.
+- Desenvolva as 3 ideias-chave e descreva verbalmente 1 exemplo de código ou equação de forma clara.
+- Faça o fechamento convidando o ouvinte a consultar a fonte (ex: 'Para mais detalhes, confira o Capítulo X, página Y').
+- Integre as citações na própria fala de forma natural (não use colchetes, diga 'conforme o autor aponta no capítulo...').
+- Expanda siglas para a pronúncia correta (ex: escreva 'V-A-E', 'L-L-M'). Mantenha os termos do glossário em inglês intactos.
+
+REGRAS RÍGIDAS DE FORMATAÇÃO (CRÍTICO PARA O SISTEMA DE VOZ):
+1. PROIBIDO usar marcações de roteiro. Não escreva 'Locutor:', '[Música]', '(pausa)', '[Suspiro]', etc.
+2. PROIBIDO usar formatação Markdown. Não use asteriscos (*), sublinhados (_), hashtags (#) ou hifens de lista (-).
+3. PROIBIDO adicionar introduções ou conclusões em texto (como "Aqui está o seu texto" ou "Espero que goste").
+4. Escreva APENAS o texto exato que será vocalizado, em parágrafos corridos. Use vírgulas e pontos finais para guiar a respiração e as pausas da voz.
+"""
