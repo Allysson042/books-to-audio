@@ -39,7 +39,12 @@ class OpenRouterProvider(LLMProvider):
             {"role": "system", "content": system},
             {"role": "user", "content": user}]})
         r.raise_for_status()
-        return r.json()["choices"][0]["message"]["content"]
+        msg = r.json()["choices"][0]["message"]
+        # Router grátis pode devolver modelo de reasoning (content null) — usa o reasoning ou falha p/ fallback.
+        text = msg.get("content") or msg.get("reasoning") or ""
+        if not text.strip():
+            raise RuntimeError(f"OpenRouter ({self.model}) devolveu conteúdo vazio: {str(msg)[:200]}")
+        return text
 
 class OpenCodeSubprocessProvider(LLMProvider):
     """Fallback experimental: chama `opencode run`. Frágil — usar só se free APIs falharem."""

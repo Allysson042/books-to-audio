@@ -1,0 +1,21 @@
+[
+  {"id": "Q1", "en": "What is the loss function of a VAE?",
+   "pt": "Como é a função de perda (loss) da VAE?",
+   "expected_ids": ["ch03_p108-110_0010"],
+   "note": "Caso difícil: ELBO/lower bound não existem nos chunks; testa honestidade"},
+  {"id": "Q2", "en": "How does the reparameterization trick work in VAEs?",
+   "pt": "Como funciona o truque de reparametrização em VAEs?",
+   "expected_ids": ["ch03_p106-108_0009"]},
+  {"id": "Q3", "en": "How does the GAN discriminator work in the DCGAN example?",
+   "pt": "Como funciona o discriminador da GAN no exemplo DCGAN?",
+   "expected_ids": ["ch04_p126-129_0002", "ch04_p133-136_0005", "ch04_p136-139_0006",
+                    "ch04_p125-127_0001", "ch04_p123-125_0000"],
+   "note": "Vale qualquer chunk DCGAN do Cap 4 (conceito distribuído em seções vizinhas)"},
+  {"id": "Q4", "en": "How do GANs and diffusion models differ?",
+   "pt": "Qual a diferença entre GANs e diffusion models?",
+   "expected_chapters": [4, 8],
+   "note": "Cross-capítulo: acerto = ≥1 chunk de cada cap no top-5"},
+  {"id": "Q5", "en": "What is the cosine diffusion schedule?",
+   "pt": "O que é o cosine diffusion schedule?",
+   "expected_ids": ["ch08_p238-240_0003", "ch08_p240-242_0004"]}
+]

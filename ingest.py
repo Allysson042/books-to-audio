@@ -269,19 +269,18 @@ def ensure_macros(chapters: list[dict], chapter_texts: dict[int, str],
     from dotenv import load_dotenv
     load_dotenv()
     cache_dir.mkdir(parents=True, exist_ok=True)
+    # Chain com fallback (Gemini -> OpenRouter -> ...): macros não dependem de 1 provider.
+    sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+    try:
+        from llm_provider import build_chain  # type: ignore
+        chain = build_chain()
+        if not chain:
+            print("[macros] Nenhum provider com key no .env; usando heurística.", file=sys.stderr)
+            chain = None
+    except Exception as e:
+        print(f"[macros] Chain indisponível ({e}); usando heurística.", file=sys.stderr)
+        chain = None
     infos: dict[int, dict] = {}
-    provider = None
-    if not skip_llm and os.getenv("GEMINI_API_KEY"):
-        sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
-        try:
-            from llm_provider import GeminiProvider  # type: ignore
-            provider = GeminiProvider(api_key=os.environ["GEMINI_API_KEY"], model=model)
-        except Exception as e:
-            print(f"[macros] Gemini indisponível ({e}); usando heurística.", file=sys.stderr)
-            provider = None
-    elif not skip_llm:
-        print("[macros] GEMINI_API_KEY ausente; usando heurística. Rode com chave p/ resumos fiéis.",
-              file=sys.stderr)
 
     for ch in chapters:
         n = ch["chapter"]
@@ -292,18 +291,19 @@ def ensure_macros(chapters: list[dict], chapter_texts: dict[int, str],
             infos[n] = {"summary_2lines": two, "macro_file": md_path.name}
             continue
         full = chapter_texts.get(n, "")
-        if provider and full.strip():
+        if chain and not skip_llm and full.strip():
+            from llm_provider import complete_with_fallback  # type: ignore
             sample = full[:MACRO_CHARS]
             raw = None
             for attempt in range(1, 4):
                 try:
-                    raw = provider.complete(
+                    raw, _prov = complete_with_fallback(
                         MACRO_SYSTEM,
                         MACRO_USER_TPL.format(chapter=n, title=ch["title"],
                                               bstart=ch["pdf_start"] - BOOK_PAGE_OFFSET,
                                               bend=ch["pdf_end"] - BOOK_PAGE_OFFSET,
                                               sample=sample),
-                        max_tokens=1500)
+                        max_tokens=1500, chain=chain)
                     break
                 except Exception as e:
                     if "429" in str(e) and attempt < 3:
@@ -313,7 +313,8 @@ def ensure_macros(chapters: list[dict], chapter_texts: dict[int, str],
                         import time
                         time.sleep(wait)
                     else:
-                        print(f"[macros] Cap {n}: LLM falhou ({e}); heurística.", file=sys.stderr)
+                        print(f"[macros] Cap {n}: LLM falhou ({str(e)[-200:]}); heurística.",
+                              file=sys.stderr)
                         break
             if raw is not None:
                 two, macro = parse_macro_output(raw)

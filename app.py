@@ -38,6 +38,8 @@ persona = st.sidebar.selectbox("Persona", ["tecnico_direto", "iniciante_guiado"]
 offline = st.sidebar.toggle("Modo offline (cache demo)", value=False)
 use_cache = st.sidebar.toggle("Usar cache (texto+áudio)", value=True,
                               help="OFF = ignora a leitura do cache e gera de novo (escrita continua).")
+use_rerank = st.sidebar.toggle("Re-rank (cross-encoder)", value=False,
+                               help="OFF = usa o top-5 direto do RRF. Compare os dois modos.")
 chapter = int(scope.split(":")[0].replace("Cap", "")) if scope != "Livro todo" else None
 
 with st.sidebar.expander("Mapa do livro (nível 1)"):
@@ -60,8 +62,8 @@ def _reranker() -> Reranker:
 q = st.text_input("Pergunte ou peça resumo de capítulo",
                   placeholder="Ex: O que é ELBO em VAEs? | Explique GANs vs Diffusion")
 
-# resultados de outro contexto (query/escopo/persona) não valem mais
-ctx = (q, scope, persona)
+# resultados de outro contexto (query/escopo/persona/rerank) não valem mais
+ctx = (q, scope, persona, use_rerank)
 if st.session_state.get("ctx") != ctx:
     for k in ("pass1", "pass2", "mp3"):
         st.session_state.pop(k, None)
@@ -70,7 +72,7 @@ if st.session_state.get("ctx") != ctx:
 if q:
     with st.spinner("Recuperando chunks (Chroma + BM25 → RRF → re-rank)..."):
         cands = _store().search(q, chapter=chapter, top_n=20)
-        top5 = _reranker().rerank(q, cands, top_n=5) if cands else []
+        top5 = _reranker().rerank(q, cands, top_n=5) if (cands and use_rerank) else cands[:5]
 
     if not top5:
         st.warning("Nada encontrado neste escopo. Tente 'Livro todo'.")
@@ -83,8 +85,9 @@ if q:
         with st.expander(f"Chunks recuperados ({len(top5)}) — ver fontes", expanded=False):
             for i, r in enumerate(top5, 1):
                 m = r["metadata"]
+                rr = f"{r['rerank']:.4f}" if r.get("rerank") is not None else "–"
                 st.markdown(f"**{i}. {r['citation']}** · {m['section']} · `{m['type']}` · "
-                            f"re-rank `{r['rerank']}`")
+                            f"re-rank `{rr}`")
             pick = st.selectbox("Ver texto do chunk:",
                                 [f"{i}. {r['doc_id']}" for i, r in enumerate(top5, 1)])
             st.write(top5[int(pick.split(".")[0]) - 1]["text"])
@@ -94,13 +97,14 @@ if q:
                       "rank_denso": str(c["dense_rank"] or "–"),
                       "rank_BM25": str(c["sparse_rank"] or "–"),
                       "RRF": f"{c['rrf']:.5f}",
-                      "re-rank": next((f"{t['rerank']:.4f}" for t in top5
-                                       if t["doc_id"] == c["doc_id"]), "–")}
+                  "re-rank": next((f"{t['rerank']:.4f}" for t in top5
+                                   if t["doc_id"] == c["doc_id"] and t.get("rerank") is not None), "–")}
                      for c in cands],
                     width="stretch")
             if macro and st.checkbox(f"Resumo macro Cap {chapter} (nível 2)"):
                 st.markdown(macro[:3000] + ("…" if len(macro) > 3000 else ""))
             st.caption(f"Query: {q!r} · escopo: {scope} · persona: {persona} · "
+                       f"re-rank: {'on' if use_rerank else 'off'} · "
                        f"offline: {offline} · cache: {'on' if use_cache else 'off'}")
 
         t1, t2 = st.tabs(["Pass1 · resumo técnico", "Pass2 · roteiro TTS"])
