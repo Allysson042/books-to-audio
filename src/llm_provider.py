@@ -15,6 +15,7 @@ class GeminiProvider(LLMProvider):
     def __init__(self, api_key: str, model: str = "gemini-3.6-flash"):
         import google.generativeai as genai
         genai.configure(api_key=api_key)
+        self.model_name = model
         self.model = genai.GenerativeModel(model)
     def complete(self, system: str, user: str, max_tokens: int = 1500) -> str:
         resp = self.model.generate_content(f"{system}\n\n{user}")
@@ -28,6 +29,7 @@ class OpenRouterProvider(LLMProvider):
     def __init__(self, api_key: str, model: str = "openrouter/free"):
         self.api_key = api_key
         self.model = model
+        self.model_name = model
     def complete(self, system: str, user: str, max_tokens: int = 1500) -> str:
         import httpx
         r = httpx.post(self.URL, timeout=120, headers={
@@ -49,6 +51,7 @@ class OpenRouterProvider(LLMProvider):
 class OpenCodeSubprocessProvider(LLMProvider):
     """Fallback experimental: chama `opencode run`. Frágil — usar só se free APIs falharem."""
     name = "opencode-subprocess"
+    model_name = "opencode run"
 
     def complete(self, system: str, user: str, max_tokens: int = 1500) -> str:
         import subprocess, textwrap
@@ -85,11 +88,24 @@ def build_chain(primary: str | None = None) -> list[LLMProvider]:
 def complete_with_fallback(system: str, user: str, max_tokens: int = 1500,
                            chain: list[LLMProvider] | None = None) -> tuple[str, str]:
     """Tenta cada provider em ordem; retorna (texto, nome_do_provider). Erro claro se todos falharem."""
+    import time
     errors: list[str] = []
+    in_chars = len(system) + len(user)
     for p in chain or build_chain():
+        model = getattr(p, "model_name", getattr(p, "model", "?"))
+        if not isinstance(model, str):
+            model = getattr(model, "model_name", "?")
+        t0 = time.time()
         try:
-            return p.complete(system, user, max_tokens), p.name
+            text = p.complete(system, user, max_tokens)
+            # Log p/ o terminal do servidor: visível em `streamlit run` e em scripts.
+            print(f"[llm-call] provider={p.name} model={model} "
+                  f"in={in_chars}ch(~{in_chars//4}tok) out={len(text)}ch(~{len(text)//4}tok) "
+                  f"{time.time()-t0:.1f}s", flush=True)
+            return text, p.name
         except Exception as e:
+            print(f"[llm-call] provider={p.name} model={model} FALHOU "
+                  f"({str(e)[-150:]})", flush=True)
             errors.append(f"{p.name}: {str(e)[-300:]}")
     raise RuntimeError("Todos os LLM providers falharam. "
                        "Verifique GEMINI_API_KEY / OPENROUTER_API_KEY no .env. Detalhes: "
