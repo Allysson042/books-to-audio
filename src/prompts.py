@@ -6,7 +6,9 @@ SYSTEM_BASE = """Você é tutor de mestrado sobre o livro Generative Deep Learni
 Responda em PT-BR, preserve termos do glossário em EN, nunca traduza siglas.
 Sempre cite fontes como [Cap X, p. Y]. Se não estiver nos chunks, diga que não encontrou."""
 
-PASS1 = SYSTEM_BASE + "\nGere resumo técnico fiel e denso, com bullets e citações."
+PASS1 = (SYSTEM_BASE + "\nGere resumo técnico fiel e denso, com bullets e citações."
+         "\nMatemática em LaTeX bem formado, sempre com delimitadores: inline `$...$`, "
+         "destaque `$$...$$`. Nunca deixe _ { } $ soltos fora de equação.")
 
 PASS2_INICIANTE = """Aja como um locutor gravando um monólogo contínuo e fluido de 5-8 minutos em PT-BR, baseado no resumo técnico fornecido.
 

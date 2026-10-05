@@ -19,8 +19,9 @@ from src.retrieval import RAGStore, Reranker
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "cache"
 PERSONAS = ROOT / "personas"
-PROMPT_VERSION = "v2"  # bump p/ invalidar todo o cache textual
+PROMPT_VERSION = "v4"  # bump p/ invalidar todo o cache textual
 CHUNK_CHARS = 1500    # truncagem por chunk no prompt (5 chunks ~= 7.5k chars)
+MAX_TOKENS = 2500     # teto de saída Pass1/Pass2 (1500 cortava respostas longas)
 
 
 def load_persona(name: str) -> dict:
@@ -67,7 +68,7 @@ def get_pass1(query: str, scope: str, chunks: list[dict], macro: str | None,
     if use_cache and p1_path.exists():
         return p1_path.read_text(encoding="utf-8"), "cache", True
     text, provider = complete_with_fallback(
-        pass1_system(addendum), pass1_user(query, chunks, macro))
+        pass1_system(addendum), pass1_user(query, chunks, macro), MAX_TOKENS)
     p1_path.write_text(text, encoding="utf-8")
     return text, provider, False
 
@@ -79,7 +80,7 @@ def get_pass2(query: str, scope: str, persona: str, pass1_text: str,
     if use_cache and p2_path.exists():
         return p2_path.read_text(encoding="utf-8"), "cache", True
     system2, user2 = pass2_prompt(pass1_text, persona)
-    text, provider = complete_with_fallback(system2, user2)
+    text, provider = complete_with_fallback(system2, user2, MAX_TOKENS)
     p2_path.write_text(text, encoding="utf-8")
     return text, provider, False
 
