@@ -1,11 +1,18 @@
 """MVP Streamlit: chat + escopo + persona + debug RAG + áudio."""
 import json
+import logging
 from pathlib import Path
+
+# Silencia o file-watcher fuçando submódulos de visão do `transformers`
+# (ModuleNotFoundError: torchvision — ruído inofensivo, nosso pipeline é só texto).
+logging.getLogger("streamlit.watcher.local_sources_watcher").setLevel(logging.CRITICAL)
 
 import streamlit as st
 
 from src.generate import chunk_sig_of, get_pass1, get_pass2, load_persona
+from src.markdown_math import render_mixed
 from src.retrieval import RAGStore, Reranker
+from src.retrieval_tree import TreeStore
 from src.tts_provider import synthesize
 
 st.set_page_config(page_title="Books to Audio — GDL", layout="wide")
@@ -40,6 +47,8 @@ use_cache = st.sidebar.toggle("Usar cache (texto+áudio)", value=True,
                               help="OFF = ignora a leitura do cache e gera de novo (escrita continua).")
 use_rerank = st.sidebar.toggle("Re-rank (cross-encoder)", value=False,
                                help="OFF = usa o top-5 direto do RRF. Compare os dois modos.")
+strategy = st.sidebar.selectbox("Estratégia", ["vectorless", "vetorial" ],
+                                help="vectorless = LLM navega no sumário (árvore), sem vetores.")
 chapter = int(scope.split(":")[0].replace("Cap", "")) if scope != "Livro todo" else None
 
 with st.sidebar.expander("Mapa do livro (nível 1)"):
@@ -58,21 +67,35 @@ def _reranker() -> Reranker:
     return Reranker()
 
 
+@st.cache_resource
+def _treestore() -> TreeStore:
+    return TreeStore()
+
+
 # -- busca --------------------------------------------------------------------
 q = st.text_input("Pergunte ou peça resumo de capítulo",
                   placeholder="Ex: O que é ELBO em VAEs? | Explique GANs vs Diffusion")
 
-# resultados de outro contexto (query/escopo/persona/rerank) não valem mais
-ctx = (q, scope, persona, use_rerank)
+# resultados de outro contexto (query/escopo/persona/rerank/estratégia) não valem mais
+ctx = (q, scope, persona, use_rerank, strategy)
 if st.session_state.get("ctx") != ctx:
     for k in ("pass1", "pass2", "mp3"):
         st.session_state.pop(k, None)
     st.session_state["ctx"] = ctx
 
 if q:
-    with st.spinner("Recuperando chunks (Chroma + BM25 → RRF → re-rank)..."):
-        cands = _store().search(q, chapter=chapter, top_n=20)
-        top5 = _reranker().rerank(q, cands, top_n=5) if (cands and use_rerank) else cands[:5]
+    if strategy == "vectorless":
+        with st.spinner("Navegando na árvore (LLM escolhe as seções)..."):
+            try:
+                top5 = _treestore().search(q, chapter=chapter, use_cache=use_cache)
+                cands = top5
+            except (RuntimeError, ValueError) as e:
+                st.error(str(e))
+                top5, cands = [], []
+    else:
+        with st.spinner("Recuperando chunks (Chroma + BM25 → RRF → re-rank)..."):
+            cands = _store().search(q, chapter=chapter, top_n=20)
+            top5 = _reranker().rerank(q, cands, top_n=5) if (cands and use_rerank) else cands[:5]
 
     if not top5:
         st.warning("Nada encontrado neste escopo. Tente 'Livro todo'.")
@@ -85,18 +108,20 @@ if q:
         with st.expander(f"Chunks recuperados ({len(top5)}) — ver fontes", expanded=False):
             for i, r in enumerate(top5, 1):
                 m = r["metadata"]
-                rr = f"{r['rerank']:.4f}" if r.get("rerank") is not None else "–"
-                st.markdown(f"**{i}. {r['citation']}** · {m['section']} · `{m['type']}` · "
-                            f"re-rank `{rr}`")
+                extra = (f"caminho `{r['tree_path']}`" if strategy == "vectorless"
+                         else f"re-rank `{f'{r['rerank']:.4f}' if r.get('rerank') is not None else '–'}`")
+                st.markdown(f"**{i}. {r['citation']}** · {m['section']} · `{m['type']}` · {extra}")
+            if strategy == "vectorless" and top5 and st.checkbox("Raciocínio da navegação"):
+                st.write(top5[0].get("thinking", ""))
             pick = st.selectbox("Ver texto do chunk:",
                                 [f"{i}. {r['doc_id']}" for i, r in enumerate(top5, 1)])
             st.write(top5[int(pick.split(".")[0]) - 1]["text"])
             if st.checkbox("Debug RAG (tabela RRF top-20 → re-rank top-5)"):
                 st.dataframe(
                     [{"doc_id": c["doc_id"], "citação": c["citation"],
-                      "rank_denso": str(c["dense_rank"] or "–"),
-                      "rank_BM25": str(c["sparse_rank"] or "–"),
-                      "RRF": f"{c['rrf']:.5f}",
+                      "rank_denso": str(c.get("dense_rank") or "–"),
+                      "rank_BM25": str(c.get("sparse_rank") or "–"),
+                      "RRF": f"{c['rrf']:.5f}" if c.get("rrf") is not None else "–",
                   "re-rank": next((f"{t['rerank']:.4f}" for t in top5
                                    if t["doc_id"] == c["doc_id"] and t.get("rerank") is not None), "–")}
                      for c in cands],
@@ -104,7 +129,8 @@ if q:
             if macro and st.checkbox(f"Resumo macro Cap {chapter} (nível 2)"):
                 st.markdown(macro[:3000] + ("…" if len(macro) > 3000 else ""))
             st.caption(f"Query: {q!r} · escopo: {scope} · persona: {persona} · "
-                       f"re-rank: {'on' if use_rerank else 'off'} · "
+                       f"estratégia: {strategy}"
+                       + (f" · re-rank: {'on' if use_rerank else 'off'}" if strategy == "vetorial" else "") + " · "
                        f"offline: {offline} · cache: {'on' if use_cache else 'off'}")
 
         t1, t2 = st.tabs(["Pass1 · resumo técnico", "Pass2 · roteiro TTS"])
@@ -112,7 +138,7 @@ if q:
             p1 = st.session_state.get("pass1")
             if p1:
                 st.caption(_badge(p1["provider"], p1["cached"]))
-                st.markdown(p1["text"])
+                render_mixed(st, p1["text"])
             else:
                 st.info("Nada gerado ainda.")
             if st.button("Gerar resumo", type="primary"):
