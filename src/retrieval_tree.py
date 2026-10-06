@@ -23,8 +23,8 @@ from src.tree_index import load_tree
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "cache"
-MAX_NODES = 4       # nós por query
-MAX_CHUNKS = 6      # chunks finais (paridade aprox. com o top-5 vetorial)
+MAX_NODES = 6       # nós por query
+MAX_CHUNKS = 10      # chunks finais (paridade aprox. com o top-5 vetorial)
 
 SEARCH_SYSTEM = """Você navega no sumário em árvore de um livro técnico (títulos + resumos + páginas).
 Dada a pergunta, escolha os nós (seções; só use capítulo se a pergunta for panorâmica)
