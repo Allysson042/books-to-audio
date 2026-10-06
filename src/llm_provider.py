@@ -42,8 +42,10 @@ class OpenRouterProvider(LLMProvider):
             {"role": "user", "content": user}]})
         r.raise_for_status()
         msg = r.json()["choices"][0]["message"]
-        # Router grátis pode devolver modelo de reasoning (content null) — usa o reasoning ou falha p/ fallback.
-        text = msg.get("content") or msg.get("reasoning") or ""
+        # Modelos reasoning devolvem o pensamento em `reasoning` e a resposta em `content`.
+        # Usa SÓ content (pensamento nunca vaza p/ tela); se vazio, falha p/ fallback.
+        # (reasoning exclude:true quebra este modelo — content volta vazio. Não usar.)
+        text = (msg.get("content") or "").strip()
         if not text.strip():
             raise RuntimeError(f"OpenRouter ({self.model}) devolveu conteúdo vazio: {str(msg)[:200]}")
         return text
