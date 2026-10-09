@@ -13,7 +13,7 @@ from src.generate import chunk_sig_of, get_pass1, get_pass2, load_persona
 from src.markdown_math import render_mixed
 from src.retrieval import RAGStore, Reranker
 from src.retrieval_tree import TreeStore
-from src.tts_provider import synthesize
+from src.tts_provider import synthesize, synthesize_premium
 
 st.set_page_config(page_title="Books to Audio — GDL", layout="wide")
 st.title("Books to Audio — Generative Deep Learning")
@@ -49,6 +49,8 @@ use_rerank = st.sidebar.toggle("Re-rank (cross-encoder)", value=False,
                                help="OFF = usa o top-5 direto do RRF. Compare os dois modos.")
 strategy = st.sidebar.selectbox("Estratégia", ["vectorless", "vetorial" ],
                                 help="vectorless = LLM navega no sumário (árvore), sem vetores.")
+premium_voice = st.sidebar.toggle("Voz premium (OpenRouter TTS)", value=False,
+                                  help="ON = sintetiza via OpenRouter (pago, ~$0,06/áudio). OFF = Edge-TTS grátis.")
 chapter = int(scope.split(":")[0].replace("Cap", "")) if scope != "Livro todo" else None
 
 with st.sidebar.expander("Mapa do livro (nível 1)"):
@@ -181,11 +183,27 @@ if q:
             st.divider()
             p2 = st.session_state.get("pass2")
             if p2:
-                st.caption(f"Roteiro pronto ({len(p2['text'])} chars · voz `{voice}`)")
+                import os as _os
+                _override = _os.getenv("OPENROUTER_TTS_VOICE", "")
+                pvoice = (_override if premium_voice and _override
+                          else (load_persona(persona).get("tts_voice_openrouter", voice)
+                                if premium_voice else voice))
+                st.caption(f"Roteiro pronto ({len(p2['text'])} chars · voz `{pvoice}`"
+                           + (" · premium" if premium_voice else "") + ")")
                 if st.button("Gerar áudio (5-8min)"):
                     try:
-                        with st.spinner(f"Sintetizando com {voice}..."):
-                            mp3, engine = synthesize(p2["text"], voice, use_cache)
+                        with st.spinner(f"Sintetizando com {pvoice}..."):
+                            if premium_voice:
+                                try:
+                                    mp3, engine, n = synthesize_premium(
+                                        p2["text"], pvoice, use_cache=use_cache)
+                                    engine = f"{engine} ({n} fatia(s))"
+                                except RuntimeError as e:
+                                    st.warning(f"Premium indisponível ({str(e)[:120]}…) — "
+                                               f"caindo p/ Edge-TTS grátis.")
+                                    mp3, engine = synthesize(p2["text"], voice, use_cache)
+                            else:
+                                mp3, engine = synthesize(p2["text"], voice, use_cache)
                         st.session_state["mp3"] = str(mp3)
                         st.caption(f"via `{engine}`"
                                    + (" · do cache" if engine == "cache" else ""))
