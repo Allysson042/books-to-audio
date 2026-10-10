@@ -19,8 +19,8 @@ from src.retrieval import RAGStore, Reranker
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "cache"
 PERSONAS = ROOT / "personas"
-PROMPT_VERSION = "v4"  # bump p/ invalidar todo o cache textual
-CHUNK_CHARS = 1500    # truncagem por chunk no prompt (5 chunks ~= 7.5k chars)
+PROMPT_VERSION = "v5"  # bump p/ invalidar todo o cache textual
+CHUNK_CHARS = 4500    # cobre ~todos os chunks inteiros (max 4864); corte em fronteira de palavra
 MAX_TOKENS = 2500     # teto de saída Pass1/Pass2 (1500 cortava respostas longas)
 
 
@@ -35,6 +35,13 @@ def pass1_system(persona_addendum: str) -> str:
             + f"\nPerfil do leitor: {persona_addendum}")
 
 
+def _clip(text: str, limit: int = CHUNK_CHARS) -> str:
+    """Corta em fronteira de palavra; marca [...] se cortou (p/ o modelo saber)."""
+    if len(text) <= limit:
+        return text
+    return text[:limit].rsplit(" ", 1)[0] + " […]"
+
+
 def pass1_user(query: str, chunks: list[dict], macro: str | None) -> str:
     parts = [f"Pergunta: {query}"]
     if macro:
@@ -42,7 +49,7 @@ def pass1_user(query: str, chunks: list[dict], macro: str | None) -> str:
     parts.append("Chunks recuperados (fontes — cite como [Cap X, p. Y]):")
     for c in chunks:
         m = c["metadata"]
-        parts.append(f"- {c['citation']} {m['section']} [{m['type']}]: {c['text'][:CHUNK_CHARS]}")
+        parts.append(f"- {c['citation']} {m['section']} [{m['type']}]: {_clip(c['text'])}")
     parts.append("Responda em PT-BR. Se os chunks não contiverem a resposta, diga que não encontrou.")
     return "\n\n".join(parts)
 
