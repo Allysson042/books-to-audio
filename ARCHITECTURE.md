@@ -39,24 +39,36 @@
 - Kit demo: `scripts/demo_seed.py` pré-gera 3 Q&A + 2 MP3. Ex: "Explique GANs vs Diffusion como se fosse cap 4", "O que é ELBO em VAEs?".
 - Anti-demo-effect: se API falhar/quota estourar, modo offline serve cache.
 
-## Diagrama
+## Evolução pós-grill-me (tudo implementado e validado — ver `TASKS.md`)
+- **Ramo 2 — duas estratégias com toggle**: (a) vetorial (RRF + re-rank *desligável*, default OFF após régua mostrar que o cross-encoder rebaixava chunks didáticos); (b) vectorless estilo PageIndex (`src/tree_index.py` + `src/retrieval_tree.py`): árvore L2→L3→L4 do TOC (242 nós, ranges por irmão) + LLM escolhe seções via JSON (parser tolerante + retry), sem vetores, sem re-rank. Tradução de query p/ EN só faz sentido no ramo vetorial (no vectorless o LLM já casa PT→EN).
+- **Ramo 1/3 — fidelidade de contexto**: Pass1 recebe chunks ~inteiros (`CHUNK_CHARS=4500`, corte em palavra; regra: UI mostra = LLM recebe); Pass1 permite LaTeX com render híbrido (`src/markdown_math.py`: inline no markdown, bloco no `st.latex`); teto de saída `MAX_TOKENS=2500`.
+- **Ramo 3 — providers**: chain configurável (`LLM_PRIMARY`, `GEMINI_MODEL`, `OPENROUTER_MODEL`); regra **só-`content`** (pensamento de reasoning nunca vaza; `reasoning.exclude` quebra DeepSeek — não usar); log `[llm-call]` (provider/modelo/tamanhos/tempo) no terminal.
+- **Ramo 4 — TTS premium opcional**: `synthesize_premium()` via OpenRouter (`OPENROUTER_TTS_MODEL`, default `microsoft/mai-voice-2.1` com vozes PT-BR por persona) + fatiamento (~2500ch, cache por fatia) + concat ffmpeg + trava `TTS_MAX_CHARS` + toggle sidebar (OFF = Edge grátis, zero gasto). Achado: Gemini 3.8 Flash TTS **inventa trechos** (provado via transcrição+diff) — MAI é o default premium por fidelidade literal.
+- **Ramo 5/6 — UI e régua**: chunks em expander colapsado, abas Pass1/Pass2 independentes (auto-encadeiam), toggles de cache / re-rank / estratégia / voz premium, logs `[llm-call]`/`[tts-call]`; `scripts/` com `golden.json` (5 douradas PT+EN) + `eval_retrieval.py` (hit-rate por estágio) + `fix_summaries.py`.
+- **Cache (regra geral)**: tudo cacheia (texto, seleção da árvore, fatias de áudio); versões (`PROMPT_VERSION`, `TTS_VERSION`, `TREE_VERSION`) invalidam; toggle OFF pula leitura, mantém escrita.
+
+## Diagrama (atual: 2 estratégias, TTS premium opcional)
 ```
-[PDF] --PyMuPDF--> [chunks + metadata + resumos macro]
+[PDF] --PyMuPDF--> [chunks + metadata + resumos macro + árvore TOC]
                           |
-                     [Chroma + BM25]
-                          |
-[query + escopo + persona] -> [RRF top20 -> re-rank top5]
+              +-----------+-----------+
+              |                       |
+     [Chroma + BM25]           [tree_livro.json]
+              |                       |
+[query + escopo + persona] -> [RRF top20 -> re-rank top5]  (vetorial, re-rank toggável)
+[query + escopo + persona] -> [LLM escolhe seções na árvore]  (vectorless)
                           |
         [mapa + macro + micro + glossário + persona] -> [LLM pass1] -> [LLM pass2 roteiro]
                           |
-              [Edge-TTS / Piper] -> [MP3 cache] -> [Streamlit player]
+     [Edge-TTS / Piper / OpenRouter-TTS premium] -> [MP3 cache] -> [Streamlit player]
 ```
 
 ## Backlog (sprints 2h/semana)
-- S0 (2h): setup env, `.env`, ingest skeleton, 1 cap teste.
-- S1 (2x2h): ingest completo + mapa + macros + Chroma + BM25.
-- S2 (2h): retrieval + re-rank + filtro escopo + painel debug.
-- S3 (2x2h): LLMProvider (Gemini) + 2-pass + personas YAML + glossário + citações.
-- S4 (2h): TTSProvider + cache MP3 + player Streamlit.
-- S5 (2h): kit demo + modo offline + polish seminário (diagrama + métricas).
-- Futuro: VLM p/ figuras, Qdrant, editor persona, avaliação RAGAS.
+- S0 (2h): setup env, `.env`, ingest skeleton, 1 cap teste. **[x]**
+- S1 (2x2h): ingest completo + mapa + macros + Chroma + BM25. **[x]**
+- S2 (2h): retrieval + re-rank + filtro escopo + painel debug. **[x]**
+- S3 (2x2h): LLMProvider (Gemini) + 2-pass + personas YAML + glossário + citações. **[x]**
+- S4 (2h): TTSProvider + cache MP3 + player Streamlit. **[x]**
+- S5 (2h): kit demo + modo offline + polish seminário (diagrama + métricas). **[ ]**
+- Extras feitos pós-S4: régua dourada + toggle re-rank + tradução-EN planejada (só vetorial) + vectorless + TTS premium + observabilidade.
+- Futuro: VLM p/ figuras, Qdrant, editor persona, avaliação RAGAS, chunking estrutural, MOS de áudio.

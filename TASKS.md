@@ -3,8 +3,8 @@
 > Agentes OpenCode: leiam este arquivo + `ARCHITECTURE.md` + `AGENTS.md` no início de cada sessão.
 > Atualizem os checkboxes ao concluir. `TodoWrite` é volátil — isto aqui é permanente.
 
-## Estado atual (2026-09-16)
-- Grill-me concluído. Scaffold inicial criado. S0 concluído. **S1 concluído** (196 chunks, 14 caps). **S2 concluído**. **S3 implementado** (live E2E OK via OpenRouter). **S4 concluído**. Pronto para S5.
+## Estado atual (2026-10-10)
+- Sistema maduro e validado pela equipe: S0–S4 concluídos, base RAG dual (vetorial + vectorless com toggle), 2-pass + TTS (Edge grátis + premium OpenRouter) funcionais. Banco completo (196 chunks, 14 caps, 14/14 macros LLM). Pronto para S5 (kit demo + modo offline, alinhar com a equipe).
 
 ## S0 — Setup [x]
 - [x] Criar `.venv`, instalar `requirements.txt`, copiar `.env.example` → `.env` com `GEMINI_API_KEY`
@@ -39,23 +39,33 @@
 - [ ] Polish: diagrama + métricas + vídeo backup
 
 ## UI funcional (pós-S4) [x] — ver `anotations/ui-refactor.md`
-- [x] Chunks em expander colapsado + colunas Pass1/Pass2 sempre visíveis e independentes
-- [x] Toggle "Usar cache" (lê OFF, escreve sempre) + `get_pass1/get_pass2` + áudio na col Pass2
+- [x] Chunks em expander colapsado + abas Pass1/Pass2 independentes (auto-encadeiam; roteiro gera resumo antes se preciso)
+- [x] Toggles sidebar: "Usar cache" (lê OFF, escreve sempre), re-rank (default OFF), estratégia vetorial|vectorless, voz premium
+- [x] `get_pass1/get_pass2` + áudio na aba Pass2 (player + download, fallback Edge automático)
+- [x] Render LaTeX híbrido Pass1 (`src/markdown_math.py`); watcher `torchvision` silenciado no app
+
+## Extras implementados (pós-S4, validados) [x]
+- [x] Régua dourada: `scripts/golden.json` (Q1–Q5 PT+EN) + `scripts/eval_retrieval.py` (hit por estágio: denso/híbrido/final). Baseline 5/10: híbrido acha 9/10 no top-20, re-rank derrubava 4 → default OFF.
+- [x] Vectorless com toggle (ver `anotations/vectorless-pageindex.md`): `src/tree_index.py` + `src/retrieval_tree.py`, árvore L2→L3→L4 (242 nós), mesmo formato de saída, downstream intacto.
+- [x] TTS premium OpenRouter (ver `anotations/tts-openrouter-plan.md`): fatiamento + concat + trava de custo + fallback Edge. MAI-Voice default (Gemini TTS inventa trechos — ver log fidelidade).
+- [x] Observabilidade: logs `[llm-call]` / `[tts-call]` no terminal (provider, modelo, tamanhos, tempo).
+- [x] `scripts/fix_summaries.py`: reparo dos `summary_2lines` sem quota + rebuild da árvore.
+- [x] Fidelidade de contexto: Pass1 recebe chunks ~inteiros (`CHUNK_CHARS=4500`; regra UI mostra = LLM recebe); MAI-Voice é o default premium (Gemini TTS inventa trechos — ver log 05/10).
 
 ## Futuro (pós-seminário)
 - [ ] VLM para descrever figuras
 - [ ] Avaliação RAGAS, editor de persona, Qdrant
-- [ ] Vectorless (PageIndex-style) como 2ª estratégia com toggle — ver `anotations/vectorless-pageindex.md`
-- [x] **Vectorless implementado (pós-S5, pedido da equipe)**: `src/tree_index.py` gera `cache/tree_livro.json` (14 caps, 149 seções, do TOC+macros, sem LLM); `src/retrieval_tree.py` (`TreeStore`: LLM escolhe nós via JSON, mapeia p/ chunks existentes, seleção cacheada, sem re-rank); sidebar "Estratégia: vetorial|vectorless" com debug do `thinking`+caminho. Downstream (Pass1/Pass2/TTS) intacto. Teste A/B manual: Q5 diffusion schedule → 4 chunks corretos da seção.
-- [x] **Árvore hierárquica real (plano `anotations/tree-hierarchy-plan.md`)**: nós L2→L3→L4 aninhados do TOC (242 seções/subseções, era flat), range = `[início, próximo irmão)` — pai cobre filhos; `retrieval_tree` expande descendentes + prompt indentado; `TREE_VERSION=2` invalida `tree_sel_*` antigas. Aceite: query seção Cap1 pp. 4–8 → 4 chunks (era 2).
-- **Fidelidade prompt chunks**: Pass1 truncava chunks em 1500ch (UI mostrava inteiro) — modelo sinalizou o corte honestamente. `CHUNK_CHARS=4500` (~todos inteiros, corte em palavra + `[…]`), `PROMPT_VERSION=v5`. Regra: o que a UI mostra como fonte = o que o LLM recebe.
-- [x] **TTS premium OpenRouter (plano `anotations/tts-openrouter-plan.md`)**: `OpenRouterTTSProvider` (`POST /audio/speech`, httpx, model `OPENROUTER_TTS_MODEL` default `microsoft/mai-voice-2.1`); vozes PT-BR por persona (`tts_voice_openrouter`: Pedro=técnico, Luana=iniciante); `synthesize_premium()` fatia roteiros (~2500ch, cache por fatia) + concat ffmpeg (via `imageio-ffmpeg`, sem apt) + trava `TTS_MAX_CHARS=15000`; toggle "Voz premium" na sidebar (OFF=Edge grátis) com fallback automático p/ Edge; log `[tts-call]` por fatia. Validado: fatia única 6s + 2 fatias 3m40s concatenadas, cache-hit na 2ª. `load_dotenv` no tts_provider (chamadas fora do chain).
-- **Fidelidade TTS (Gemini→MAI)**: Gemini 3.8 Flash TTS **inventou ~600ch** no meio do áudio (ponte didática ausente do roteiro — provado via transcrição+diff; TTS LLM-backed gera, não toca). Protocolo: mesmo roteiro 5864ch no `mai-voice-2.1` → transcrição limpa, zero inserção. Premium default de volta p/ MAI (`OPENROUTER_TTS_VOICE` desativado no `.env`); Gemini vira fallback.
+- [ ] Tradução da query p/ EN (só ramo vetorial — no vectorless o LLM já casa PT→EN)
+- [ ] Chunking estrutural (seções naturais em vez de janela fixa)
+- [ ] MOS de áudio (nota 1–5 nas douradas); clonagem de voz; streaming PCM
 
 ## Notas p/ futuras sessões (aprendizados 16/09 — não repetir erros)
 - **Query EN > PT no retrieval** (corpus e MiniLM são EN; resposta sai PT-BR de todo jeito). Otimização futura: traduzir query p/ EN antes de buscar. **Medir antes de mexer**: montar 3-5 perguntas douradas (pergunta + cap/pág esperados) e checar hit-rate top-5 em PT vs EN antes de rechunkar (rechunk = reembedar tudo).
 - **Gemini**: chave nova só aceita família 3.x (`gemini-3.6-flash` ok). Quota diária reseta 00:00 Pacific = 04:00 BRT. Caps 12-14 seguem em macro heurística (ver comando no log S1).
 - **OpenRouter**: key em `OPENROUTER_API_KEY` no `.env`; default `openrouter/free` (aleatório — fixar via `OPENROUTER_MODEL` p/ qualidade estável em PT-BR). Headers HTTP do httpx devem ser **ASCII puro** (X-Title com `á` quebrou).
+- **Re-rank default OFF** (régua 5/10: cross-encoder rebaixava chunks didáticos; toggle na sidebar p/ A/B). Reavaliar se trocar o modelo ou o prefetch.
+- **Árvore**: rebuild grátis via `python -m src.tree_index`; bump `TREE_VERSION` invalida `tree_sel_*`. Comparar com o sumário do PDF se algo parecer errado.
+- **Premium local (`.env`, não commitado)**: pins por ambiente via `OPENROUTER_MODEL` / `OPENROUTER_TTS_MODEL` / `OPENROUTER_TTS_VOICE`; repo default segue grátis (router free + Edge).
 - **`opencode-subprocess` é fallback experimental e perigoso em testes**: invoca sessão aninhada; nunca disparar em AppTest/CI (validar só chain, com stub).
 - **Streamlit**: `st.dataframe` exige colunas de tipo homogêneo (pyarrow); usar strings + `width="stretch"`. Ruído `torchvision` no log = file-watcher fuçando o `transformers`, ignorar. AppTest desta versão **não tem `.audio`** (checar player via `download_button`).
 - **Cache**: texto `cache/pass1_*.md` / `pass2_*` (bust via `PROMPT_VERSION`); áudio `cache/audio/` (bust via `TTS_VERSION`). Repetir query = instantâneo, sem gastar quota.
@@ -70,3 +80,4 @@
 - 2026-09-16 (S2): `src/retrieval.py` — `RAGStore` (denso Chroma + esparso BM25, RRF k=60, `where chapter` nos dois lados) + `Reranker` (cross-encoder ms-marco-MiniLM-L-6-v2 CPU, lazy) + `retrieve()` top-20→top-5. `app.py`: escopo dinâmico via `mapa_livro.json`, macro do cap em foco (nível 2), top-5 com `[Cap X, p. Y]` + tipo + score, tabela debug com ranks denso/BM25/RRF/re-rank. `streamlit run` healthy (200). Bugfix pós-teste: colunas do debug como string homogênea (pyarrow quebrava com int+`–` misturados) + `width="stretch"` (deprecation do `use_container_width`).
 - 2026-09-16 (S3): `OpenRouterProvider` (`openrouter/free` default, via httpx, sem nova dep) + `build_chain()` (só providers com key; ordem `LLM_PRIMARY`, opencode-subprocess por último) + `complete_with_fallback()` (retorna texto+provider, erro agregado). `src/generate.py`: `answer()` retrieve→Pass1→Pass2, personas via YAML (`system_addendum`), glossário injetado, cache `pass1_{h}.md`/`pass2_{persona}_{h}.md` (hash `PROMPT_VERSION|persona|escopo|query|chunk_ids`). `app.py`: botão 2-pass + abas Pass1/Pass2 + badge provider/cache. Validado com stub (geração→cache→cache-hit) + AppTest sem exceção. **Live E2E OK via OpenRouter** (query ELBO → Pass1 com `[Cap X, p. Y]` + Pass2 roteiro). Bugfix: header `X-Title` com `á` quebrava httpx (ASCII) — removido acento. Gemini segue 429 até ~04:00 BRT 17/09.
 - 2026-09-16 (S4): `src/tts_provider.py` — `synthesize()` sync (Edge-TTS + fallback Piper, retorna `(mp3, engine)`), `clean_for_speech()` (tira `#/**/`` `/bullets/`[MARCADORES]` do roteiro antes da fala), cache `cache/audio/{sha}.mp3` + sidecar `.json`. Voz por persona (`tts_voice` no YAML: Francisca=iniciante, Antonio=técnico). `app.py`: roteiro em `session_state`, botão áudio habilitado após 2-pass + player + download. Validado: 1358 chars → 591KB via edge-tts, cache-hit na 2ª, AppTest sem exceção. Piper: código pronto, binário não instalado (erro claro se Edge falhar offline).
+- 2026-10-10 (docs refresh): projeto maduro — `ARCHITECTURE.md` ganhou seção "Evolução pós-grill-me" + diagrama dual + backlog atualizado; README reescrito (2 estratégias, premium, scripts, env completa); `TASKS.md` reorganizado (extras pós-S4 em seção própria). Repo default segue 100% grátis; pins pagos vivem só no `.env` local.

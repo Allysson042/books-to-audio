@@ -6,13 +6,15 @@ Nada aqui afeta `~/.config/opencode/` (global). Tudo é local ao projeto.
 ## O que é
 RAG hierárquico + TTS sobre o livro "Generative Deep Learning" (PDF único).
 Case de seminário: LLM para texto + TTS para áudio. Saída em PT-BR, termos EN preservados.
-Stack: Python + Streamlit + Chroma local + sentence-transformers CPU + BM25 + Edge-TTS/Piper.
-Custo R$0. Ver `ARCHITECTURE.md` para decisões travadas (fonte de verdade de design).
+Stack: Python + Streamlit + Chroma local + sentence-transformers CPU + BM25 + Edge-TTS/Piper (+ OpenRouter opcional p/ texto premium e TTS premium).
+R$0 no default (pins pagos só no `.env` local). Ver `ARCHITECTURE.md` para decisões travadas (fonte de verdade de design).
 
 ## Estrutura
 - `app.py` — UI Streamlit (chat + escopo + persona + player). Só leitura.
 - `ingest.py` — ingestão one-shot do PDF → Chroma + BM25 + macros.
 - `src/llm_provider.py` — abstração LLM (Gemini free primário, fallback Groq/OpenRouter/Ollama, opencode-subprocess experimental).
+- `src/retrieval.py` — RAG vetorial (híbrida+RRF+re-rank toggável); `src/retrieval_tree.py` + `src/tree_index.py` — alternativa vectorless (toggle na UI, mesmo formato de saída).
+- `src/generate.py` — 2-pass com cache (`PROMPT_VERSION` invalida); `src/markdown_math.py` — render LaTeX híbrido.
 - `src/tts_provider.py` — Edge-TTS primário + Piper fallback, cache em `cache/audio/`.
 - `src/prompts.py` — prompts 2-pass + glossário.
 - `personas/*.yaml` — `tecnico_direto`, `iniciante_guiado`.
