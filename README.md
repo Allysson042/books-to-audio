@@ -95,7 +95,7 @@ personas/          # tecnico_direto.yaml, iniciante_guiado.yaml (tom + vozes Edg
 scripts/           # golden.json (5 douradas) + eval_retrieval.py + fix_summaries.py
 storage/           # Chroma + BM25 (gerado, não commitar)
 cache/             # macros, árvore, pass1/pass2, seleções, MP3s (gerado, não commitar)
-anotations/        # planos e notas locais de pesquisa (ignorado no git)
+docs/              # notas de design, planos e STATE.md (versionado)
 ARCHITECTURE.md    # decisões de design travadas | TASKS.md # progresso por sprint
 ```
 

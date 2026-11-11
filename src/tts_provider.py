@@ -7,7 +7,7 @@ Uso:
 Cache: `cache/audio/{sha256(TTS_VERSION|voice|texto)}.mp3` (+ sidecar .json).
 Nunca re-sintetiza se o MP3 existir (custo R$0 + demo offline).
 
-Premium (plano anotations/tts-openrouter-plan.md): `synthesize_premium()` usa
+Premium (plano docs/tts-openrouter-plan.md): `synthesize_premium()` usa
 POST /audio/speech do OpenRouter, fatiando roteiros longos (limite por request)
 com cache por fatia + concat via ffmpeg. Trava `TTS_MAX_CHARS` anti-torra-crédito.
 """

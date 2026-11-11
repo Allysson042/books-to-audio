@@ -38,7 +38,7 @@
 - [ ] Modo offline (serve cache se API falhar)
 - [ ] Polish: diagrama + métricas + vídeo backup
 
-## UI funcional (pós-S4) [x] — ver `anotations/ui-refactor.md`
+## UI funcional (pós-S4) [x] — ver `docs/ui-refactor.md`
 - [x] Chunks em expander colapsado + abas Pass1/Pass2 independentes (auto-encadeiam; roteiro gera resumo antes se preciso)
 - [x] Toggles sidebar: "Usar cache" (lê OFF, escreve sempre), re-rank (default OFF), estratégia vetorial|vectorless, voz premium
 - [x] `get_pass1/get_pass2` + áudio na aba Pass2 (player + download, fallback Edge automático)
@@ -46,8 +46,8 @@
 
 ## Extras implementados (pós-S4, validados) [x]
 - [x] Régua dourada: `scripts/golden.json` (Q1–Q5 PT+EN) + `scripts/eval_retrieval.py` (hit por estágio: denso/híbrido/final). Baseline 5/10: híbrido acha 9/10 no top-20, re-rank derrubava 4 → default OFF.
-- [x] Vectorless com toggle (ver `anotations/vectorless-pageindex.md`): `src/tree_index.py` + `src/retrieval_tree.py`, árvore L2→L3→L4 (242 nós), mesmo formato de saída, downstream intacto.
-- [x] TTS premium OpenRouter (ver `anotations/tts-openrouter-plan.md`): fatiamento + concat + trava de custo + fallback Edge. MAI-Voice default (Gemini TTS inventa trechos — ver log fidelidade).
+- [x] Vectorless com toggle (ver `docs/vectorless-pageindex.md`): `src/tree_index.py` + `src/retrieval_tree.py`, árvore L2→L3→L4 (256 nós), mesmo formato de saída, downstream intacto.
+- [x] TTS premium OpenRouter (ver `docs/tts-openrouter-plan.md`): fatiamento + concat + trava de custo + fallback Edge. MAI-Voice default (Gemini TTS inventa trechos — ver log fidelidade).
 - [x] Observabilidade: logs `[llm-call]` / `[tts-call]` no terminal (provider, modelo, tamanhos, tempo).
 - [x] `scripts/fix_summaries.py`: reparo dos `summary_2lines` sem quota + rebuild da árvore.
 - [x] Fidelidade de contexto: Pass1 recebe chunks ~inteiros (`CHUNK_CHARS=4500`; regra UI mostra = LLM recebe); MAI-Voice é o default premium (Gemini TTS inventa trechos — ver log 05/10).
