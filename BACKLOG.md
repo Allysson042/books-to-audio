@@ -15,10 +15,10 @@
 | ID | Data | Sintoma | Onde | Impacto | Pri |
 |---|---|---|---|---|---|
 | B1 | 2026-11-11 | Toggle "Modo offline" é cosmético: só aparece num caption, não altera nenhum caminho de leitura de cache | `app.py:45` (toggle) + `app.py:136` (caption) | Parece ter fallback offline na demo e não tem | P2 |
-| B2 | 2026-11-11 | Campo de pergunta dispara geração com texto **parcial** ao trocar de aba do navegador: o `text_input` comita no blur → rerun → `if q:` dispara retrieval/LLM sem botão | `app.py:78-79` (widget, `live=False`) + `app.py:88` (`if q:`) + `app.py:83-86` (wipe de pass1/pass2/mp3) | Gasta quota com pergunta incompleta, apaga resultados na tela | P1 |
-| B3 | 2026-11-11 | Input de pergunta é `st.text_input` de 1 linha, sem botão de enviar e sem quebra de linha; trocar por input estilo chat (Enter envia, Shift+Enter quebra linha) | `app.py:78` | UX da demo; é o fix natural de B2 — resolver junto | P3 |
-| B4 | 2026-11-11 | Retrieval roda em **todo** rerun (não memoizado por query): clicar "Gerar resumo"/"Gerar roteiro" reexecuta a busca e, no vectorless, pode chamar LLM de novo | `app.py:88-99` (busca) + `app.py:153`/`app.py:179` (`st.rerun`) | Latência e custo repetidos a cada clique | P2 |
 
 ## Resolvidos
 | ID | Fechado | Sintoma | Fix (commit) |
 |---|---|---|---|
+| B2 | 2026-11-11 | Campo de pergunta disparava geração com texto parcial ao trocar de aba do navegador | `9b99de7` — `st.chat_input` + query efetiva só do submit (`session_state["query"]`) |
+| B3 | 2026-11-11 | Input era `st.text_input` de 1 linha, sem botão de enviar | `9b99de7` — input estilo chat (`st.chat_input`, Enter envia) |
+| B4 | 2026-11-11 | Retrieval rodava em todo rerun, não memoizado por query | `9b99de7` — memoização `ret_ctx`/`top5`/`cands` (10,8s → 0,0s no rerun) |
