@@ -75,29 +75,56 @@ def _treestore() -> TreeStore:
 
 
 # -- busca --------------------------------------------------------------------
-q = st.text_input("Pergunte ou peça resumo de capítulo",
-                  placeholder="Ex: O que é ELBO em VAEs? | Explique GANs vs Diffusion")
+# `chat_input` só devolve texto no rerun do submit (trocar de aba do navegador ou
+# perder o foco não comita texto parcial). Precisa ficar no corpo principal:
+# dentro de tabs/columns/expander ele quebra o layout (fixa no rodapé do container).
+submitted = st.chat_input(
+    placeholder="Pergunte ou peça resumo de capítulo — ex: O que é ELBO em VAEs?",
+    key="q_input")
+if submitted and submitted.strip():
+    st.session_state["query"] = submitted.strip()
+
+# query efetiva = última submetida (nunca o texto em edição no widget)
+query = st.session_state.get("query", "")
 
 # resultados de outro contexto (query/escopo/persona/rerank/estratégia) não valem mais
-ctx = (q, scope, persona, use_rerank, strategy)
+ctx = (query, scope, persona, use_rerank, strategy)
 if st.session_state.get("ctx") != ctx:
     for k in ("pass1", "pass2", "mp3"):
         st.session_state.pop(k, None)
     st.session_state["ctx"] = ctx
 
-if q:
-    if strategy == "vectorless":
-        with st.spinner("Navegando na árvore (LLM escolhe as seções)..."):
-            try:
-                top5 = _treestore().search(q, chapter=chapter, use_cache=use_cache)
-                cands = top5
-            except (RuntimeError, ValueError) as e:
-                st.error(str(e))
-                top5, cands = [], []
-    else:
-        with st.spinner("Recuperando chunks (Chroma + BM25 → RRF → re-rank)..."):
-            cands = _store().search(q, chapter=chapter, top_n=20)
-            top5 = _reranker().rerank(q, cands, top_n=5) if (cands and use_rerank) else cands[:5]
+if not query:
+    st.info("Digite uma pergunta no campo abaixo — ex: **O que é ELBO em VAEs?** · "
+            "**Explique GANs vs Diffusion** · **Resuma o Cap 4**")
+
+if query:
+    q = query  # alias curto: mesma string de antes, chaves de cache de `src.generate` intactas
+
+    # busca memoizada por contexto: os `st.rerun()` dos botões não rebuscam (nem gastam LLM)
+    if st.session_state.get("ret_ctx") != ctx:
+        err = None
+        if strategy == "vectorless":
+            with st.spinner("Navegando na árvore (LLM escolhe as seções)..."):
+                try:
+                    top5 = _treestore().search(q, chapter=chapter, use_cache=use_cache)
+                    cands = top5
+                except (RuntimeError, ValueError) as e:
+                    err = str(e)
+                    top5, cands = [], []
+        else:
+            with st.spinner("Recuperando chunks (Chroma + BM25 → RRF → re-rank)..."):
+                cands = _store().search(q, chapter=chapter, top_n=20)
+                top5 = _reranker().rerank(q, cands, top_n=5) if (cands and use_rerank) else cands[:5]
+        st.session_state["ret_ctx"] = ctx
+        st.session_state["top5"] = top5
+        st.session_state["cands"] = cands
+        st.session_state["ret_err"] = err
+
+    top5 = st.session_state["top5"]
+    cands = st.session_state.get("cands", top5)
+    if st.session_state.get("ret_err"):
+        st.error(st.session_state["ret_err"])
 
     if not top5:
         st.warning("Nada encontrado neste escopo. Tente 'Livro todo'.")
