@@ -19,6 +19,7 @@ R$0 no default (pins pagos só no `.env` local). Ver `ARCHITECTURE.md` para deci
 - `src/prompts.py` — prompts 2-pass + glossário.
 - `personas/*.yaml` — `tecnico_direto`, `iniciante_guiado`.
 - `ARCHITECTURE.md` — design travado. `TASKS.md` — progresso (atualizar sempre).
+- `BACKLOG.md` — caixa de entrada de ajustes pequenos e bugs conhecidos (`P1`/`P2`/`P3`), com `arquivo:linha` para o executor achar sem investigar.
 - `data/` — PDF de entrada (não commitar). `storage/chroma/` — vetores. `cache/` — resumos + MP3.
 
 ## Comandos
@@ -38,4 +39,5 @@ streamlit run app.py
 - Preservar termos do glossário em EN (`src/prompts.py`).
 - 2-pass com cache: não regenerar LLM/TTS se cache existir.
 - Ao terminar uma etapa, marcar `[x]` em `TASKS.md` e sugerir próximo passo S0→S5.
+- Bug pequeno ou ajuste que não é tarefa de sprint → registrar em `BACKLOG.md` (não inflar `TASKS.md`).
 - Não commitar `.env`, `*.pdf`, `storage/`, `cache/`, `venv/`.

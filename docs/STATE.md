@@ -1,6 +1,6 @@
 # STATE.md — Índice e status de `docs/`
 
-> Memória quente desta pasta. Backlog do projeto: `../TASKS.md`; design travado: `../ARCHITECTURE.md`.
+> Memória quente desta pasta. Backlog do projeto: `../TASKS.md`; ajustes pequenos/bugs: `../BACKLOG.md`; design travado: `../ARCHITECTURE.md`.
 > Este arquivo NÃO duplica o backlog — só indexa as notas e aponta o que ainda está vivo nelas.
 
 ## Contexto Atual (2026-11-11)
@@ -25,6 +25,7 @@ O que resta de vivo são as seções "Fora de escopo"/"Futuro" e alguns resíduo
 
 ## Pendências reais (das seções "Fora de escopo")
 - [ ] S5: `scripts/demo_seed.py` (3 Q&A + 2 MP3) — **não existe**.
+- [ ] S5: modo offline real (rastreado como **B1** em `../BACKLOG.md`).
 - [ ] Comparação formal vetorial × vectorless nas 5 douradas.
 - [ ] Resumos por seção (`tree-hierarchy-plan.md` §4).
 - [ ] `pip install pageindex` / TOC via Flash do PageIndex (opcional).
@@ -37,3 +38,4 @@ O que resta de vivo são as seções "Fora de escopo"/"Futuro" e alguns resíduo
 
 ## Próximo Passo Imediato
 Atacar S5 (`scripts/demo_seed.py` + 2 MP3 pré-gerados + modo offline); depois a comparação formal vetorial × vectorless nas 5 douradas.
+Miudezas descobertas em sessão (fora de sprint) vão para `../BACKLOG.md`, não para cá.
