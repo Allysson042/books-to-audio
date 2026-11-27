@@ -19,7 +19,8 @@ pergunta ambígua) ainda não está medido.
 | `tts-openrouter-plan.md` | 2026-10-06 | implementado | `src/tts_provider.py` `synthesize_premium`, `split_slices`, `TTS_MAX_CHARS=15000`; `OPENROUTER_TTS_MODEL` no `.env.example` | `../ARCHITECTURE.md` Ramo 4 |
 | `tree-hierarchy-plan.md` | 2026-10-09 | implementado | `src/tree_index.py` `build_tree()` com `children`; `cache/tree_livro.json` version 2 | `../ARCHITECTURE.md` Ramo 2 (`../TASKS.md` só conclusão) |
 | `count_tokens.py` | — | parcial/frágil | `ingest.load_chapters`/`clean_page_text` existem, mas `tiktoken` não está em `requirements.txt` | só anotação |
-| `LIMITS.md` | 2026-11-26 | P0 + V0→V3 implementados; P1a aberto | auditoria + medições; P0 sem regressão (5/10 re-rank ON, 7/10 híbrido); V0/V1 (ranked 10/10 @5, 63%); V2 (271 chunks por seção, 99%); V2.1 (`tree_fit` com desconto 0.5, 36/36 resgatados); V3 (`TREE_PROMPT=v1|v2`, v2 = 100%/10/10, prompt 16.819→28.298); vetorial 3/5 inalterado | `../TASKS.md` §P0, §V0/V1, §V2, §V2.1+V3 |
+| `LIMITS.md` | 2026-11-26 | P0 + V0→V3 implementados; P1a aberto | auditoria + medições; P0 sem regressão (5/10 re-rank ON, 7/10 híbrido); V0/V1 (ranked 10/10 @5, 63%); V2 (271 chunks por seção, 99%); V2.1 (`tree_fit` com desconto 0.5, 36/36 resgatados); V3 (`TREE_PROMPT=v1\|v2`, v2 = 100%/10/10, prompt 16.819→28.298); vetorial 3/5 inalterado | `../TASKS.md` §P0, §V0/V1, §V2, §V2.1+V3 |
+| `UX/` (README + 01–07 + mockup) | 2026-11-27 | **U0–U5 implementados**; validação humana pendente | auditoria U1–U26 + heurísticas + baseline; wireframes e matriz de estados; design system; roadmap; spec; **guia visual canônico** (`06`); **resultado antes/depois + roteiro de demo** (`07`); mock navegável. **U0:** tema light/dark, `theme/copy`, chips. **U1:** sem abas, CTA "Ouvir", trilha, `mp3_sig`, retry, `↻ Regerar`. **U2:** sem sidebar; header + `⚙ Ajustes`; U25. **U3:** cards de fonte, relevância, trecho/debug em popover. **U4:** `history.py` (turnos, restore sem LLM, export, clear). **U5:** dock, apresentação, foco; **pós-U5:** cards com superfície por tema + player custom (static; reiniciar). AppTest + CSS 1/1 + smoke 200 | `../TASKS.md`, `../ARCHITECTURE.md`, `../README.md` (bloqueados; sincronizar) |
 
 ## Decisões já absorvidas (não rediscutir)
 - Re-rank default **OFF** (cross-encoder rebaixava chunks didáticos).
@@ -42,7 +43,7 @@ pergunta ambígua) ainda não está medido.
 - [ ] Comparação formal vetorial × vectorless nas 5 douradas.
 - [ ] Resumos por seção (`tree-hierarchy-plan.md` §4).
 - [ ] `pip install pageindex` / TOC via Flash do PageIndex (opcional).
-- [ ] Estética da UI: CSS, cores, responsivo, landing (`ui-refactor.md` §5).
+- [ ] **UX U0→U5** (`UX/04-roadmap.md`): **U0–U5 implementados em 2026-11-27** (resumo antes/depois em `UX/07-resultado.md`). Tema light/dark; jornada linear com CTA "Ouvir"; sidebar removida; fontes em cards; ☰ Sessão (restore sem LLM, export `.md`); dock com **player custom** (static) e modo apresentação; cards com superfície por tema. Validado: AppTest (normal/apresentação/dock/fallback), CSS, `curl` 200 em `/app/static`, smoke 200. **Falta (humano/S5):** **reiniciar o app** para o static serving, teste do fluxo real LLM/TTS, conferência visual (player/dark/390 px), capturas, pin `streamlit>=1.64,<2`, sincronizar `TASKS.md`/`ARCHITECTURE.md`/`README.md`, `demo_seed.py`/offline.
 - [ ] MOS 1–5, clonagem de voz, streaming PCM, SSML (`tts-openrouter-plan.md` §6).
 
 ## Resíduos e pendências de doc

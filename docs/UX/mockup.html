@@ -1,0 +1,1368 @@
+<!doctype html>
+<html lang="pt-BR" data-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MOCK — Books to Audio · proposta UX (U0–U5)</title>
+<style>
+/* =========================================================
+   TOKENS (iguais a docs/UX/03-design-system.md)
+   ========================================================= */
+:root{
+  --bg:#FBFAF7; --surface:#FFFFFF; --alt:#F2EFE9; --border:#E4DFD5;
+  --text:#1B1A17; --muted:#5C574E; --primary:#0E6F63; --primary-weak:#E3F1EE;
+  --on-primary:#FFFFFF; --on-accent:#FFFFFF; --accent:#6D28D9; --accent-weak:#EDE7FD;
+  --success:#157F3D; --warning:#A15C07; --error:#B3261E; --error-weak:#FBEAE8;
+  --canvas:#EDEAE3; --shadow:0 1px 2px rgba(0,0,0,.06);
+  --radius:12px; --radius-sm:8px;
+}
+html[data-theme="dark"]{
+  --bg:#12110F; --surface:#1A1917; --alt:#24221F; --border:#33302B;
+  --text:#EDEAE3; --muted:#A8A29A; --primary:#4FD1BD; --primary-weak:#14332F;
+  --on-primary:#06231F; --on-accent:#1B1030; --accent:#A78BFA; --accent-weak:#241B3F;
+  --success:#4ADE80; --warning:#FBBF24; --error:#F87171; --error-weak:#2A1615;
+  --canvas:#0B0A09; --shadow:none;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--canvas); color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;
+  padding-bottom:60px;
+}
+button{font-family:inherit}
+.hidden{display:none !important}
+
+/* =========================================================
+   BARRA DO MOCK (chrome do arquivo, não é o produto)
+   ========================================================= */
+.mockbar{
+  position:sticky; top:0; z-index:60;
+  display:flex; flex-wrap:wrap; align-items:center; gap:10px 16px;
+  padding:10px 16px; background:#171614; color:#EDEAE3;
+  border-bottom:1px solid #2C2A25;
+}
+.mockbar .brand{font-size:12px; font-weight:700; letter-spacing:.04em; text-transform:uppercase}
+.mockbar .brand span{font-weight:400; color:#A8A29A; text-transform:none; letter-spacing:0; margin-left:6px}
+.scenarios{display:flex; gap:4px; flex-wrap:wrap}
+.scenarios button{
+  background:#26241F; color:#CFCAC2; border:1px solid #36332C;
+  border-radius:999px; padding:6px 11px; font-size:11.5px; cursor:pointer;
+}
+.scenarios button:hover{border-color:#5C574E; color:#fff}
+.scenarios button.on{background:var(--primary); border-color:var(--primary); color:var(--on-primary); font-weight:600}
+.tools{margin-left:auto; display:flex; gap:6px}
+.tools button{
+  background:#26241F; color:#EDEAE3; border:1px solid #36332C;
+  border-radius:8px; padding:6px 10px; font-size:11.5px; cursor:pointer;
+}
+.tools button:hover{border-color:#7A7369}
+
+/* =========================================================
+   MOLDURA / AVISO
+   ========================================================= */
+.wrap{max-width:1280px; margin:0 auto; padding:16px}
+.banner{
+  display:flex; gap:10px; align-items:flex-start;
+  background:var(--surface); border:1px solid var(--border); border-left:4px solid var(--warning);
+  border-radius:10px; padding:10px 14px; font-size:12.5px; color:var(--muted);
+  margin:0 0 14px;
+}
+.banner b{color:var(--text)}
+.frame{
+  background:var(--bg); border:1px solid var(--border); border-radius:16px;
+  box-shadow:0 20px 60px rgba(0,0,0,.14); overflow:visible;
+}
+.frame-bar{
+  display:flex; align-items:center; gap:10px; padding:9px 14px;
+  background:var(--alt); border-bottom:1px solid var(--border);
+  border-radius:16px 16px 0 0;
+}
+.dotrow{display:flex; gap:5px}
+.dotrow i{width:10px;height:10px;border-radius:50%;display:block;background:#C9C2B6}
+.dotrow i:nth-child(1){background:#E5735F}
+.dotrow i:nth-child(2){background:#E0B45C}
+.dotrow i:nth-child(3){background:#7FBF8C}
+.url{
+  flex:1; background:var(--surface); border:1px solid var(--border); border-radius:6px;
+  padding:3px 10px; font-size:11px; color:var(--muted);
+}
+.frame-bar .tag{font-size:10.5px; color:var(--muted)}
+
+/* =========================================================
+   APP (o produto)
+   ========================================================= */
+.app{background:var(--bg); color:var(--text); position:relative; min-height:640px; border-radius:0 0 16px 16px}
+.app-head{
+  display:flex; justify-content:space-between; align-items:flex-end; gap:16px;
+  padding:24px 28px 12px;
+}
+.app-head h1{font-size:26px; line-height:1.2; margin:0; letter-spacing:-.01em; font-weight:700}
+.app-head p{margin:4px 0 0; font-size:13px; color:var(--muted)}
+.head-ctrls{display:flex; gap:8px; align-items:center}
+.select{
+  display:flex; align-items:center; gap:8px;
+  background:var(--surface); border:1px solid var(--border); border-radius:999px;
+  padding:7px 12px; font-size:12px; color:var(--text); cursor:pointer;
+}
+.select small{color:var(--muted)}
+.icon-btn{
+  width:34px;height:34px;border-radius:50%; display:grid; place-items:center;
+  background:var(--surface); border:1px solid var(--border); color:var(--text);
+  font-size:14px; cursor:pointer;
+}
+
+/* trilha */
+.rail{
+  display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+  padding:4px 28px 14px; border-bottom:1px solid var(--border);
+  font-size:12.5px; color:var(--muted);
+}
+.rail .st{display:inline-flex; align-items:center; gap:5px}
+.rail .st.done{color:var(--primary); font-weight:600}
+.rail .st.active{color:var(--text); font-weight:600}
+.rail .st.active .sy{color:var(--primary)}
+.rail .st.locked{opacity:.55}
+.rail .st.error{color:var(--error); font-weight:600}
+.rail .sep{color:var(--border)}
+
+/* colunas */
+.cols{
+  display:grid; grid-template-columns:minmax(0,1fr) 310px;
+  gap:28px; padding:20px 28px 26px; align-items:start;
+}
+.read{display:flex; flex-direction:column; gap:14px; max-width:720px; min-width:0}
+
+/* cards */
+.card{
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:16px 18px; box-shadow:var(--shadow); max-width:100%;
+}
+.card-head{display:flex; justify-content:space-between; align-items:baseline; gap:12px; margin-bottom:8px}
+.card-head h2{font-size:13px; margin:0; letter-spacing:.06em; text-transform:uppercase; color:var(--text); font-weight:700}
+.card-head .prov{font-size:11.5px; color:var(--muted); font-weight:400; text-transform:none; letter-spacing:0}
+.card-tools{display:flex; gap:4px}
+.tool{
+  background:transparent; border:1px solid transparent; color:var(--muted);
+  border-radius:6px; padding:2px 6px; font-size:12px; cursor:pointer;
+}
+.tool:hover{border-color:var(--border); color:var(--text)}
+.read-body{font-size:16px; line-height:1.7; max-width:68ch}
+.read-body p{margin:0 0 12px}
+.read-body p:last-child{margin-bottom:0}
+.cite{color:var(--primary); font-size:11.5px; white-space:nowrap; font-weight:600}
+.eq{
+  background:var(--alt); border-radius:var(--radius-sm); padding:12px 14px; margin:10px 0;
+  font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace; font-size:12.5px;
+  color:var(--text); overflow-x:auto;
+}
+.empty-card{font-size:13px; color:var(--muted); display:flex; justify-content:space-between; align-items:center; gap:12px}
+.empty-card .btn-ghost{white-space:nowrap}
+
+/* pergunta */
+.qcard{display:flex; justify-content:space-between; align-items:flex-start; gap:14px}
+.qcard .qtext{font-size:19px; line-height:1.35; font-weight:650; margin:0 0 6px}
+.qcard .qmeta{font-size:11.5px; color:var(--muted); display:flex; flex-wrap:wrap; gap:6px 10px}
+.qcard .qmeta .ok{color:var(--success)}
+.qcard .edit{
+  background:transparent; border:1px solid var(--border); border-radius:8px;
+  padding:4px 8px; color:var(--muted); font-size:12px; cursor:pointer;
+}
+
+/* fontes */
+.sources summary{
+  cursor:pointer; list-style:none; display:flex; align-items:center; gap:10px;
+  font-size:13px; color:var(--text); font-weight:600;
+}
+.sources summary::-webkit-details-marker{display:none}
+.sources summary .chev{color:var(--muted); font-size:11px; transition:transform .15s}
+.sources[open] summary .chev{transform:rotate(90deg)}
+.sources summary .meta{font-weight:400; color:var(--muted); font-size:12px}
+.sources .link{margin-left:auto; font-size:11.5px; color:var(--primary); cursor:pointer; font-weight:500}
+.src-list{display:grid; gap:8px; margin-top:12px}
+.src{background:var(--alt); border-radius:10px; padding:10px 12px; font-size:12px}
+.src .top{display:flex; justify-content:space-between; gap:10px; align-items:center; margin-bottom:4px}
+.src .cit{font-weight:700; color:var(--text)}
+.src .type{
+  font-size:10px; letter-spacing:.04em; text-transform:uppercase; color:var(--muted);
+  border:1px solid var(--border); border-radius:999px; padding:1px 7px;
+}
+.src .rel{display:flex; align-items:center; gap:7px; color:var(--muted); font-size:10.5px}
+.bar{width:78px; height:5px; background:var(--border); border-radius:99px; overflow:hidden}
+.bar i{display:block; height:100%; background:var(--primary); border-radius:99px}
+.src .snip{
+  color:var(--muted); font-size:11.5px; line-height:1.5; margin-top:6px;
+  font-family:ui-serif,Georgia,serif; font-style:italic;
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.src .open{margin-top:6px; font-size:10.5px; color:var(--primary); cursor:pointer}
+
+/* rail de ações */
+.rail-actions{display:flex; flex-direction:column; gap:10px; position:sticky; top:12px}
+.cta{
+  background:var(--primary); color:var(--on-primary); border:1px solid var(--primary);
+  border-radius:10px; padding:13px 16px; text-align:left; cursor:pointer;
+  font-size:15px; font-weight:650; line-height:1.3;
+  transition:transform .08s ease, filter .15s;
+}
+.cta:hover{filter:brightness(1.06)}
+.cta:active{transform:translateY(1px)}
+.cta small{display:block; font-weight:400; font-size:11.5px; opacity:.92; margin-top:3px}
+.btn-ghost{
+  background:transparent; color:var(--text); border:1px solid var(--border);
+  border-radius:10px; padding:10px 14px; text-align:left; font-size:13px; cursor:pointer;
+}
+.btn-ghost:hover{background:var(--alt)}
+.btn-ghost small{display:block; color:var(--muted); font-size:11px; margin-top:2px}
+.rail-meta{
+  border-top:1px solid var(--border); padding-top:10px; margin-top:2px;
+  font-size:11.5px; color:var(--muted); line-height:1.6;
+}
+.rail-meta a{color:var(--primary); cursor:pointer; text-decoration:none}
+.adv{margin-top:2px; font-size:12px; color:var(--muted)}
+.adv summary{cursor:pointer; color:var(--text); font-weight:600; list-style:none}
+.adv summary::-webkit-details-marker{display:none}
+.adv .row{display:flex; justify-content:space-between; align-items:center; padding:7px 0; border-bottom:1px dashed var(--border); gap:10px}
+.adv .row:last-child{border-bottom:none}
+.adv .row span:last-child{color:var(--muted); font-size:11px; text-align:right}
+.sim-note{font-size:10.5px; color:var(--muted); line-height:1.4; padding:0 2px}
+
+/* status */
+.status{border:1px solid var(--border); background:var(--surface); border-radius:12px; padding:12px 14px}
+.status .st-title{font-size:12.5px; font-weight:650; margin:0 0 8px; display:flex; justify-content:space-between}
+.status .timer{color:var(--muted); font-weight:400; font-variant-numeric:tabular-nums}
+.step{display:flex; align-items:center; gap:8px; padding:3px 0; font-size:12px; color:var(--muted)}
+.step .dot{
+  width:14px;height:14px;border-radius:50%;border:1px solid var(--border);
+  display:grid; place-items:center; font-size:8px; flex:none;
+}
+.step.done{color:var(--text)}
+.step.done .dot{background:var(--success); border-color:var(--success); color:#fff}
+.step.run .dot{border-color:var(--primary); animation:pulse 1.1s infinite}
+.step.run{color:var(--text); font-weight:600}
+@keyframes pulse{50%{box-shadow:0 0 0 3px var(--primary-weak)}}
+
+/* erro */
+.error-card{border-color:var(--error); background:var(--error-weak)}
+.error-card h2{color:var(--error)}
+.error-card p{font-size:13px; color:var(--text); margin:0 0 10px}
+.error-actions{display:flex; gap:8px; flex-wrap:wrap}
+.btn-primary-sm{
+  background:var(--primary); color:var(--on-primary); border:1px solid var(--primary);
+  border-radius:8px; padding:7px 12px; font-size:12px; font-weight:600; cursor:pointer;
+}
+
+/* início */
+.hero{padding:8px 0 4px}
+.hero h2{font-size:22px; margin:0 0 4px; letter-spacing:-.01em}
+.hero p{margin:0 0 14px; color:var(--muted); font-size:13px}
+.chips{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:18px}
+.chip{
+  background:var(--surface); border:1px solid var(--border); border-radius:999px;
+  padding:7px 13px; font-size:12.5px; color:var(--text); cursor:pointer;
+}
+.chip:hover{border-color:var(--primary); color:var(--primary)}
+.section-label{font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:18px 0 8px; font-weight:700}
+.chapter-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+.chapter{
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  padding:12px 14px; cursor:default;
+}
+.chapter b{font-size:13px; display:block}
+.chapter span{font-size:11.5px; color:var(--muted); display:block; margin-top:3px; line-height:1.5}
+.chapter .pages{float:right; font-size:10.5px; color:var(--muted); font-weight:400}
+
+/* player dock (fica acima da barra de pergunta) */
+.dock{
+  display:flex; align-items:center; gap:14px;
+  background:var(--surface); border-top:1px solid var(--border);
+  padding:12px 28px; position:sticky; bottom:62px; z-index:19;
+}
+.play{
+  width:38px;height:38px;border-radius:50%; border:none; cursor:pointer;
+  background:var(--accent); color:var(--on-accent); font-size:14px; display:grid; place-items:center; flex:none;
+}
+.dock .info{min-width:0; flex:none; max-width:180px}
+.dock .info b{display:block; font-size:12.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.dock .info span{font-size:11px; color:var(--muted)}
+.wave{display:flex; gap:2px; align-items:center; height:26px; flex:1; overflow:hidden}
+.wave i{width:3px; border-radius:2px; background:var(--accent); opacity:.35}
+.wave i:nth-child(3n){height:18px; opacity:.55}
+.wave i:nth-child(2n){height:24px; opacity:.45}
+.wave i:nth-child(5n){height:12px}
+.wave.playing i{animation:wave 1s infinite ease-in-out}
+@keyframes wave{50%{opacity:.9; transform:scaleY(1.25)}}
+.pbar{width:100%; height:4px; background:var(--border); border-radius:99px; overflow:hidden; margin-top:4px}
+.pbar i{display:block; height:100%; width:31%; background:var(--accent)}
+.time{font-size:11px; color:var(--muted); font-variant-numeric:tabular-nums; white-space:nowrap}
+.dock .dl{font-size:11.5px; color:var(--muted); border:1px solid var(--border); border-radius:8px; padding:5px 9px; cursor:pointer; white-space:nowrap}
+.dock .dl:hover{color:var(--text)}
+.dock .x{background:none; border:none; color:var(--muted); cursor:pointer; font-size:14px}
+
+/* barra de pergunta (chat_input) */
+.chatbar{
+  display:flex; align-items:center; gap:10px; padding:10px 18px 14px;
+  background:var(--bg); border-top:1px solid var(--border); position:sticky; bottom:0; z-index:15;
+}
+.chatbar input{
+  flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:11px 14px; font-size:13px; color:var(--text); outline:none;
+}
+.chatbar input:focus{border-color:var(--primary); box-shadow:0 0 0 3px var(--primary-weak)}
+.chatbar input::placeholder{color:var(--muted)}
+.chatbar .send{
+  background:var(--primary); color:var(--on-primary); border:none; border-radius:10px;
+  padding:11px 15px; font-size:13px; font-weight:600; cursor:pointer;
+}
+.chatbar .hint{font-size:10.5px; color:var(--muted); white-space:nowrap}
+
+/* mobile */
+.app.in-phone{
+  width:390px; margin:0 auto; min-height:0;
+  border:9px solid #24221F; border-radius:30px; overflow:hidden;
+}
+/* quando a moldura contém o telefone, ela desaparece */
+.frame:has(.app.in-phone){
+  background:transparent; border:none; box-shadow:none; overflow:visible; padding:18px 0 0;
+}
+.frame:has(.app.in-phone) .frame-bar{display:none}
+.app.in-phone .app-head{padding:18px 16px 8px; align-items:flex-start}
+.app.in-phone .app-head h1{font-size:19px}
+.app.in-phone .app-head p{font-size:11px}
+.app.in-phone .head-ctrls .select{display:none}
+.app.in-phone .rail{padding:2px 14px 10px; gap:5px; font-size:10.5px; overflow-x:auto; flex-wrap:nowrap}
+.app.in-phone .rail .lbl{display:none}
+.app.in-phone .rail .st.done .lbl,
+.app.in-phone .rail .st.active .lbl{display:inline}
+.app.in-phone .cols{grid-template-columns:1fr; gap:12px; padding:12px 14px}
+.app.in-phone .read{max-width:none; gap:10px}
+.app.in-phone .rail-actions{position:static}
+.app.in-phone .rail-meta{display:none}
+.app.in-phone .dock{padding:10px 12px; gap:8px; flex-wrap:wrap; bottom:54px}
+.app.in-phone .dock .info{max-width:120px}
+.app.in-phone .dock .wave{display:none}
+.app.in-phone .chatbar{padding:8px 10px 10px}
+.app.in-phone .chatbar .hint{display:none}
+.app.in-phone .chapter-grid{grid-template-columns:1fr}
+.app.in-phone .qcard .qtext{font-size:16px}
+
+/* modo apresentação (U5) */
+.app.present .rail-actions,
+.app.present .sources{display:none}
+.app.present .read{max-width:820px}
+.app.present .read-body{font-size:17px; line-height:1.75}
+.app.present .app-head h1{font-size:30px}
+
+/* painel de sessão / histórico (U4) */
+.scrim{position:absolute; inset:0; background:rgba(20,18,15,.35); z-index:30}
+.drawer{
+  position:absolute; top:0; right:0; bottom:0; width:330px; z-index:31;
+  background:var(--surface); border-left:1px solid var(--border);
+  box-shadow:-14px 0 40px rgba(0,0,0,.18); display:flex; flex-direction:column;
+}
+.drawer-head{
+  display:flex; justify-content:space-between; align-items:center;
+  padding:14px 16px; border-bottom:1px solid var(--border);
+}
+.drawer-head b{font-size:13px; text-transform:uppercase; letter-spacing:.06em}
+.drawer-head button{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer}
+.turns{padding:10px 12px; display:flex; flex-direction:column; gap:6px; overflow:auto; flex:1}
+.turn{
+  border:1px solid var(--border); border-radius:10px; padding:9px 11px; cursor:pointer;
+  background:var(--bg);
+}
+.turn:hover{border-color:var(--primary)}
+.turn.cur{border-color:var(--primary); background:var(--primary-weak)}
+.turn b{display:block; font-size:12px; line-height:1.4}
+.turn span{display:block; font-size:10.5px; color:var(--muted); margin-top:3px}
+.drawer-foot{border-top:1px solid var(--border); padding:10px 12px; display:flex; gap:8px; flex-wrap:wrap}
+.drawer-foot button{
+  flex:1; background:transparent; border:1px solid var(--border); color:var(--text);
+  border-radius:8px; padding:7px 9px; font-size:11px; cursor:pointer;
+}
+.drawer-foot button:hover{border-color:var(--primary); color:var(--primary)}
+
+/* =========================================================
+   VIEW: COMPARATIVO ANTES × DEPOIS
+   ========================================================= */
+.compare{display:grid; grid-template-columns:1fr 1fr; gap:18px; padding:18px}
+.compare .col{min-width:0}
+.compare h3{
+  font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted);
+  margin:0 0 8px; display:flex; align-items:center; gap:8px;
+}
+.pill{font-size:10px; letter-spacing:0; text-transform:none; border-radius:999px; padding:2px 8px; border:1px solid var(--border)}
+.pill.now{color:var(--error); border-color:var(--error)}
+.pill.next{color:var(--success); border-color:var(--success)}
+
+/* reprodução simplificada da UI ATUAL */
+.before{
+  position:relative; display:grid; grid-template-columns:190px 1fr;
+  background:#FFFFFF; color:#31333F; border:1px solid #D5DAE3; border-radius:10px;
+  overflow:hidden; font-size:11px; min-height:560px;
+}
+.before .sb{border-right:1px solid #E6E9EF; padding:12px 12px; background:#F8F9FB; position:relative}
+.before .sb h4{font-size:11px; margin:0 0 8px; color:#31333F}
+.before label{font-size:9.5px; color:#5A5F6A; display:block; margin:9px 0 3px}
+.before .field{
+  border:1px solid #D5DAE3; border-radius:6px; padding:5px 7px; font-size:10px;
+  background:#fff; color:#31333F; display:flex; justify-content:space-between;
+}
+.before .field span{color:#9AA0AB}
+.before .tog{display:flex; justify-content:space-between; align-items:center; font-size:9.5px; margin:7px 0; color:#31333F}
+.before .switch{width:24px;height:13px;border-radius:99px;background:#D5DAE3;position:relative;flex:none}
+.before .switch::after{content:"";position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:#fff}
+.before .switch.on{background:#FF4B4B}
+.before .switch.on::after{left:13px}
+.before .expander{border:1px solid #E6E9EF;border-radius:6px;padding:6px 8px;font-size:9.5px;margin-top:10px;color:#5A5F6A}
+.before .main{padding:14px 16px 54px; position:relative}
+.before .title{font-size:17px; font-weight:700; margin:0 0 10px; line-height:1.25}
+.before .info{background:#E8F4FD; border-radius:6px; padding:8px 10px; font-size:9.5px; color:#1E4A63; margin-bottom:10px}
+.before .expander2{border:1px solid #E6E9EF;border-radius:6px;padding:7px 9px;font-size:9.5px;color:#5A5F6A;margin-bottom:10px}
+.before .tabs{display:flex; gap:14px; border-bottom:1px solid #E6E9EF; font-size:10px; margin-top:8px}
+.before .tab{padding:6px 0; border-bottom:2px solid transparent; color:#5A5F6A}
+.before .tab.on{border-color:#FF4B4B; color:#31333F; font-weight:600}
+.before .void{color:#9AA0AB; font-size:9.5px; margin:10px 0}
+.before .btn{display:inline-block;background:#FF4B4B;color:#fff;border-radius:6px;padding:5px 9px;font-size:9.5px;margin-top:2px}
+.before .btn.dis{background:#E6E9EF;color:#9AA0AB}
+.before .chat{
+  position:absolute; left:16px; right:16px; bottom:12px;
+  border:1px solid #D5DAE3; border-radius:8px; padding:7px 9px; font-size:9.5px; color:#9AA0AB;
+  background:#fff;
+}
+.before .pin{
+  position:absolute; width:18px;height:18px;border-radius:50%;
+  background:#E02B20; color:#fff; font-size:9.5px; font-weight:700;
+  display:grid; place-items:center; box-shadow:0 1px 3px rgba(0,0,0,.25); z-index:5;
+}
+.legend{margin:10px 0 0; padding:0; list-style:none; font-size:11px; color:var(--muted); line-height:1.7}
+.legend b{color:var(--error); display:inline-block; width:16px}
+
+/* miniatura do depois */
+.after{
+  border:1px solid var(--border); border-radius:10px; overflow:hidden;
+  background:var(--bg); min-height:560px; display:flex; flex-direction:column;
+}
+.after .mini-head{display:flex; justify-content:space-between; align-items:center; padding:12px 14px 6px; gap:10px}
+.after .mini-head b{font-size:14px}
+.after .mini-head span{font-size:10px; color:var(--muted)}
+.after .mini-rail{display:flex; gap:5px; font-size:9.5px; color:var(--muted); padding:0 14px 8px; border-bottom:1px solid var(--border); flex-wrap:wrap}
+.after .mini-rail .done{color:var(--primary); font-weight:600}
+.after .mini-body{padding:10px 14px; display:grid; grid-template-columns:1fr 100px; gap:10px; flex:1}
+.after .mini-card{background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:8px;font-size:10px}
+.after .mini-card b{font-size:10px; display:flex; justify-content:space-between}
+.after .mini-card p{margin:4px 0 0; color:var(--muted); line-height:1.5; font-size:9.5px}
+.after .mini-cta{background:var(--primary);color:var(--on-primary);border-radius:6px;padding:7px 8px;font-size:9.5px;font-weight:700;line-height:1.3}
+.after .mini-ghost{border:1px solid var(--border);border-radius:6px;padding:5px 7px;font-size:9px;margin-top:5px;color:var(--text)}
+.after .mini-dock{
+  display:flex; align-items:center; gap:8px; border-top:1px solid var(--border);
+  padding:7px 12px; font-size:9px; color:var(--muted); background:var(--surface);
+}
+.after .mini-dock .dotp{width:20px;height:20px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center;font-size:8px}
+.changes{padding:0 18px 18px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px}
+.change{border:1px solid var(--border); background:var(--surface); border-radius:10px; padding:10px 12px}
+.change b{font-size:11.5px; display:block; margin-bottom:2px}
+.change span{font-size:11px; color:var(--muted); line-height:1.5}
+
+/* =========================================================
+   VIEW: COMPONENTES
+   ========================================================= */
+.system{padding:20px 24px 32px; display:grid; gap:22px}
+.sys-block h3{font-size:12px; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin:0 0 10px}
+.swatches{display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px}
+.sw{border:1px solid var(--border); border-radius:10px; overflow:hidden; font-size:10.5px}
+.sw .chipcolor{height:44px}
+.sw .txt{padding:6px 8px; color:var(--muted); display:flex; justify-content:space-between; gap:6px}
+.sw .txt b{color:var(--text); font-weight:600}
+.type-row{display:flex; align-items:baseline; gap:16px; border-bottom:1px dashed var(--border); padding:8px 0}
+.type-row .sample{flex:1}
+.type-row .meta{font-size:10.5px; color:var(--muted); white-space:nowrap}
+.demo-row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+.badge{display:inline-flex; align-items:center; gap:5px; border-radius:999px; padding:3px 9px; font-size:10.5px; font-weight:600}
+.badge.ok{background:var(--primary-weak); color:var(--success)}
+.badge.mut{background:var(--alt); color:var(--muted)}
+.badge.warn{background:var(--error-weak); color:var(--warning)}
+.badge.err{background:var(--error-weak); color:var(--error)}
+.micro{width:100%; border-collapse:collapse; font-size:11.5px}
+.micro th{text-align:left; color:var(--muted); font-weight:600; font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; padding:6px 8px; border-bottom:1px solid var(--border)}
+.micro td{padding:6px 8px; border-bottom:1px dashed var(--border); vertical-align:top; line-height:1.5}
+.micro td:first-child{color:var(--muted); width:42%}
+.micro td:last-child{color:var(--text)}
+.checklist{columns:2; gap:24px; font-size:11.5px; color:var(--muted); line-height:1.8; margin:0; padding-left:18px}
+.checklist li::marker{color:var(--success)}
+
+@media (max-width:900px){
+  .compare{grid-template-columns:1fr}
+  .changes{grid-template-columns:1fr}
+  .cols{grid-template-columns:1fr}
+  .rail-actions{position:static}
+  .app-head{flex-direction:column; align-items:flex-start}
+  .checklist{columns:1}
+  .chapter-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ===================== BARRA DO MOCK ===================== -->
+<header class="mockbar">
+  <div class="brand">MOCK · Books to Audio<span>proposta UX/UI · nada implementado</span></div>
+  <nav class="scenarios" id="scenarios">
+    <button data-s="start" class="on">1 · Início</button>
+    <button data-s="search">2 · Buscando</button>
+    <button data-s="sources">3 · Fontes</button>
+    <button data-s="ready">4 · Pronto</button>
+    <button data-s="error">5 · Erro</button>
+    <button data-s="mobile">6 · Mobile</button>
+    <button data-s="compare">7 · Antes × depois</button>
+    <button data-s="system">8 · Componentes</button>
+    <button data-s="present">9 · Apresentação</button>
+    <button data-s="dark">10 · Escuro</button>
+  </nav>
+  <div class="tools">
+    <button id="themeBtn" title="Alternar tema">◐ Tema</button>
+    <button id="resetBtn" title="Voltar ao início">↺ Reset</button>
+  </div>
+</header>
+
+<div class="wrap">
+  <div class="banner">
+    <div>
+      <b>Isto é um mock estático.</b> O conteúdo é <b>ilustrativo</b> (não é saída real do RAG).
+      Tempo do fluxo simulado em ~3 s (no app real, 30–120 s).<br>
+      <b>▶ Ouvir</b> anima a jornada completa · <b>3 · Fontes</b> abre os cards · <b>☰</b> mostra a sessão
+      (histórico) · <b>◐ Tema</b> alterna claro/escuro · <b>6 · Mobile</b> mostra 390 px ·
+      <b>7 · Antes × depois</b> compara com a UI atual · <b>8 · Componentes</b> mostra tokens e estados ·
+      <b>9 · Apresentação</b> esconde o avançado · <b>10 · Escuro</b> abre a proposta no tema escuro.
+    </div>
+  </div>
+
+  <!-- ===================== VIEW: APP ===================== -->
+  <section id="view-app">
+    <div class="frame">
+      <div class="frame-bar">
+        <div class="dotrow"><i></i><i></i><i></i></div>
+        <div class="url">books-to-audio.local — <b style="color:var(--text)">Generative Deep Learning</b></div>
+        <div class="tag">proposta U0+U1</div>
+      </div>
+
+      <div class="app" id="app">
+
+        <!-- header -->
+        <div class="app-head">
+          <div>
+            <h1>Generative Deep Learning</h1>
+            <p>Pergunte, leia o resumo ou ouça o capítulo</p>
+          </div>
+          <div class="head-ctrls">
+            <button class="select">Cap 4 · p.96–112 <span style="color:var(--muted)">▾</span></button>
+            <button class="select">Técnico <span style="color:var(--muted)">▾</span></button>
+            <button class="icon-btn" id="sessBtn" title="Sessão e histórico">☰</button>
+          </div>
+        </div>
+
+        <!-- trilha -->
+        <div class="rail" id="rail">
+          <span class="st locked" data-st="pergunta"><span class="sy">○</span><span class="lbl">Pergunta</span></span>
+          <span class="sep">─</span>
+          <span class="st locked" data-st="fontes"><span class="sy">○</span><span class="lbl">Fontes</span></span>
+          <span class="sep">─</span>
+          <span class="st locked" data-st="resumo"><span class="sy">○</span><span class="lbl">Resumo</span></span>
+          <span class="sep">─</span>
+          <span class="st locked" data-st="roteiro"><span class="sy">○</span><span class="lbl">Roteiro</span></span>
+          <span class="sep">─</span>
+          <span class="st locked" data-st="audio"><span class="sy">○</span><span class="lbl">Áudio</span></span>
+        </div>
+
+        <div class="cols">
+          <!-- COLUNA DE LEITURA -->
+          <div class="read">
+
+            <!-- início -->
+            <div id="empty">
+              <div class="hero">
+                <h2>O que você quer entender?</h2>
+                <p>Escolha uma pergunta pronta ou navegue pelos capítulos.</p>
+                <div class="chips">
+                  <button class="chip" data-chip="O que é ELBO em VAEs?">O que é ELBO em VAEs?</button>
+                  <button class="chip" data-chip="Explique GANs vs Diffusion">GANs vs Diffusion</button>
+                  <button class="chip" data-chip="Resuma o Cap 4">Resuma o Cap 4</button>
+                </div>
+                <div class="section-label">Ou navegue pelos capítulos</div>
+                <div class="chapter-grid">
+                  <div class="chapter">
+                    <span class="pages">p.96–112</span>
+                    <b>Cap 4 · Variational Autoencoders</b>
+                    <span>Aprende um espaço latente contínuo otimizando um limite inferior (ELBO); reconstrói e gera amostras.</span>
+                  </div>
+                  <div class="chapter">
+                    <span class="pages">p.113–140</span>
+                    <b>Cap 5 · Autoregressive Models</b>
+                    <span>PixelCNN e afins: modela a distribuição conjunta como produto de condicionais, pixel a pixel.</span>
+                  </div>
+                  <div class="chapter">
+                    <span class="pages">p.45–70</span>
+                    <b>Cap 3 · GANs</b>
+                    <span>Gerador e discriminador competem; amostras nítidas, treino instável.</span>
+                  </div>
+                  <div class="chapter">
+                    <span class="pages">p.141–168</span>
+                    <b>Cap 6 · Normalizing Flows</b>
+                    <span>Transformações invertíveis dão verossimilhança exata, com custo de arquitetura.</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- pergunta -->
+            <div class="card qcard hidden" id="qcard">
+              <div>
+                <p class="qtext" id="qtext">O que é ELBO em VAEs?</p>
+                <div class="qmeta">
+                  <span>Cap 4 · p.96–112</span><span>·</span><span>10 trechos</span><span>·</span>
+                  <span class="ok">instantâneo</span>
+                </div>
+              </div>
+              <button class="edit" id="editQ" title="Voltar ao campo de pergunta">✎</button>
+            </div>
+
+            <!-- fontes -->
+            <details class="sources card hidden" id="srcblock">
+              <summary>
+                <span class="chev">▸</span>
+                Fontes (10 trechos)
+                <span class="meta">Cap 4 · p.96–112 · sumário navegável</span>
+                <span class="link">detalhes da busca</span>
+              </summary>
+              <div class="src-list">
+                <div class="src">
+                  <div class="top">
+                    <span class="cit">[Cap 4, p.101] · Variational Autoencoders</span>
+                    <span class="type">texto</span>
+                  </div>
+                  <div class="rel"><span class="bar"><i style="width:87%"></i></span> 0,87 relevância</div>
+                  <div class="snip">“…the ELBO is a lower bound on the log-likelihood of the data, and maximizing it is equivalent to…”</div>
+                  <div class="open">ver trecho completo →</div>
+                </div>
+                <div class="src">
+                  <div class="top">
+                    <span class="cit">[Cap 4, p.99] · The Variational Autoencoder</span>
+                    <span class="type">texto</span>
+                  </div>
+                  <div class="rel"><span class="bar"><i style="width:81%"></i></span> 0,81 relevância</div>
+                  <div class="snip">“VAEs learn a latent representation by optimizing a variational lower bound…”</div>
+                  <div class="open">ver trecho completo →</div>
+                </div>
+                <div class="src">
+                  <div class="top">
+                    <span class="cit">[Cap 4, p.104] · The Loss Function</span>
+                    <span class="type">código</span>
+                  </div>
+                  <div class="rel"><span class="bar"><i style="width:76%"></i></span> 0,76 relevância</div>
+                  <div class="snip">def vae_loss(x, x_recon, z_mean, z_log_var): reconstruction = …</div>
+                  <div class="open">ver trecho completo →</div>
+                </div>
+                <div class="src">
+                  <div class="top">
+                    <span class="cit">[Cap 4, p.107] · KL Divergence</span>
+                    <span class="type">texto</span>
+                  </div>
+                  <div class="rel"><span class="bar"><i style="width:72%"></i></span> 0,72 relevância</div>
+                  <div class="snip">“The KL term penalizes the divergence between the approximate posterior and the prior…”</div>
+                  <div class="open">ver trecho completo →</div>
+                </div>
+                <div class="src">
+                  <div class="top">
+                    <span class="cit">[Cap 4, p.100] · Figure 4-4</span>
+                    <span class="type">legenda</span>
+                  </div>
+                  <div class="rel"><span class="bar"><i style="width:68%"></i></span> 0,68 relevância</div>
+                  <div class="snip">“The variational autoencoder architecture: encoder, latent space, decoder…”</div>
+                  <div class="open">ver trecho completo →</div>
+                </div>
+              </div>
+            </details>
+
+            <!-- resumo -->
+            <div class="card hidden" id="p1">
+              <div class="card-head">
+                <h2>Resumo técnico</h2>
+                <div class="card-tools">
+                  <span class="prov" id="p1prov">gerado agora · 22 s</span>
+                  <button class="tool" title="Copiar">⧉</button>
+                  <button class="tool" title="Baixar .md">⤓</button>
+                  <button class="tool" title="Regerar">↻</button>
+                </div>
+              </div>
+              <div class="read-body full">
+                <p>O <b>ELBO</b> (<i>Evidence Lower Bound</i>) é a função-objetivo do VAE: um limite inferior para a log-verossimilhança dos dados. Em vez de maximizar diretamente <span class="eq-inline">log p(x)</span>, o modelo maximiza uma quantidade que sabemos ser menor ou igual a ela — e que depende de duas parcelas: a qualidade da reconstrução e a proximidade entre a posterior aproximada e o prior. <span class="cite">[Cap 4, p.101]</span></p>
+                <p>Na prática, o termo de reconstrução puxa o decoder a reproduzir <span class="eq-inline">x</span> a partir de <span class="eq-inline">z</span>; o termo KL regulariza <span class="eq-inline">q(z|x)</span> para perto de <span class="eq-inline">N(0, I)</span>. O equilíbrio entre os dois é o que evita colapso do latente e mantém o espaço contínuo — a propriedade que permite gerar amostras novas. <span class="cite">[Cap 4, p.104]</span></p>
+                <div class="eq">ELBO = E<sub>q(z|x)</sub>[ log p(x|z) ] − D<sub>KL</sub>( q(z|x) ‖ p(z) )</div>
+                <p>O sinal negativo no KL é a razão de o VAE ser “variacional”: sem ele, o modelo pode empurrar <span class="eq-inline">q</span> para longe do prior e obter reconstruções boas com um latente desconexo. Com ele, cada ponto decodifica para algo plausível. <span class="cite">[Cap 4, p.107]</span></p>
+                <p>Para o seminário, a leitura útil é: o ELBO não é uma métrica de qualidade absoluta; é o alvo de treino. Comparar valores de ELBO entre arquiteturas diferentes não diz qual gera melhor. <span class="cite">[Cap 4, p.112]</span></p>
+                <p style="color:var(--muted);font-size:11.5px;font-style:italic;margin-top:14px">Conteúdo ilustrativo para o mock — no app, vem do RAG com citações reais.</p>
+              </div>
+              <div class="empty-card ph hidden">
+                Gere o resumo técnico · ≈15 s
+                <button class="btn-ghost" id="genP1">Gerar resumo técnico</button>
+              </div>
+            </div>
+
+            <!-- roteiro -->
+            <div class="card hidden" id="p2">
+              <div class="card-head">
+                <h2>Roteiro falado</h2>
+                <div class="card-tools">
+                  <span class="prov" id="p2prov">gerado agora · 18 s</span>
+                  <button class="tool" title="Copiar">⧉</button>
+                  <button class="tool" title="Baixar .md">⤓</button>
+                  <button class="tool" title="Regerar">↻</button>
+                </div>
+              </div>
+              <div class="read-body full">
+                <p>Vamos entender o ELBO sem fórmula decorada. Pensa num detetive que não vê o crime, só as pistas. O VAE faz o caminho inverso: precisa resumir a imagem num código curto e, desse código, reconstruir a imagem. O ELBO é a nota que diz o quão bom esse resumo é — mas é uma nota sempre um pouco pessimista: ela nunca supera a qualidade real. <span class="cite">[Cap 4, p.101]</span></p>
+                <p>Essa nota tem duas partes. A primeira premia reconstruções fiéis. A segunda cobra organização: o código precisa ficar perto de uma distribuição simples, tipo uma nuvem em volta do zero. Sem essa cobrança, o modelo decora as imagens e o espaço entre os códigos vira buraco — e aí não dá para gerar nada novo. <span class="cite">[Cap 4, p.107]</span></p>
+                <p>Por isso dizemos que o ELBO é um limite inferior. Maximizar o ELBO é empurrar o limite para cima; quando ele sobe, a verossimilhança real também sobe. É otimização por procuração: em vez de medir o que não conseguimos calcular, medimos algo que sabemos ser conservador. <span class="cite">[Cap 4, p.101]</span></p>
+                <p>Se você levar uma ideia só para a prova, leve esta: o ELBO troca um cálculo impossível por dois cálculos fáceis — reconstrução e divergência. O preço é o viés; o ganho é conseguir treinar. <span class="cite">[Cap 4, p.112]</span></p>
+                <p style="color:var(--muted);font-size:11.5px;font-style:italic;margin-top:14px">≈ 6 min de áudio · voz Pedro · grátis (Edge-TTS)</p>
+              </div>
+              <div class="empty-card ph hidden">
+                Gere o roteiro falado · ≈20 s (gera o resumo antes se preciso)
+                <button class="btn-ghost" id="genP2">Gerar roteiro falado</button>
+              </div>
+            </div>
+
+            <!-- erro -->
+            <div class="card error-card hidden" id="err">
+              <div class="card-head">
+                <h2>Fontes</h2>
+                <span class="prov">falhou</span>
+              </div>
+              <p><b>Nada neste capítulo.</b> A navegação da árvore não achou trechos relevantes no Cap 4 para esta pergunta.</p>
+              <div class="error-actions">
+                <button class="btn-primary-sm" id="retryScope">Buscar no livro todo</button>
+                <button class="btn-ghost">Ver capítulos</button>
+                <button class="btn-ghost">Detalhes</button>
+              </div>
+            </div>
+
+          </div>
+
+          <!-- RAIL DE AÇÕES -->
+          <aside class="rail-actions">
+            <button class="cta" id="listen">
+              ▶ Ouvir
+              <small id="ctaSub">resumo + roteiro + áudio · ≈6 min · grátis</small>
+            </button>
+            <button class="btn-ghost" id="onlyP1">
+              Só o resumo técnico<small>≈15 s · com citações</small>
+            </button>
+            <button class="btn-ghost" id="onlyP2">
+              Só o roteiro falado<small>≈20 s · gera o resumo antes</small>
+            </button>
+
+            <div class="rail-meta">
+              Cap 4 · Técnico<br>
+              Busca: sumário navegável<br>
+              <a id="openAdv">Ajustar →</a>
+            </div>
+
+            <details class="adv" id="adv">
+              <summary>⚙ Avançado</summary>
+              <div class="row"><span>Como buscar</span><span>Sumário navegável ▾</span></div>
+              <div class="row"><span>Reordenar resultados</span><span>desligado</span></div>
+              <div class="row"><span>Ignorar cache</span><span>desligado</span></div>
+              <div class="row"><span>Voz premium</span><span>≈US$0,06 · desligado</span></div>
+              <div class="row"><span>Modo apresentação</span><span>desligado</span></div>
+            </details>
+
+            <div class="status hidden" id="status">
+              <div class="st-title"><span>Preparando seu áudio…</span><span class="timer" id="timer">0 s</span></div>
+              <div class="step" data-step="fontes"><span class="dot"></span> Encontrando trechos no capítulo</div>
+              <div class="step" data-step="resumo"><span class="dot"></span> Escrevendo o resumo técnico</div>
+              <div class="step" data-step="roteiro"><span class="dot"></span> Adaptando para fala</div>
+              <div class="step" data-step="audio"><span class="dot"></span> Sintetizando com Pedro</div>
+            </div>
+
+            <div class="sim-note" id="simNote">Fluxo simulado em ~3 s. No app real, cada etapa leva 10–60 s; “parar” só interrompe entre etapas.</div>
+          </aside>
+        </div>
+
+        <!-- player -->
+        <div class="dock hidden" id="dock">
+          <button class="play" id="playBtn" title="Tocar">▶</button>
+          <div class="info">
+            <b id="dockTitle">ELBO em VAEs</b>
+            <span>Pedro · Edge-TTS · premium desligado</span>
+          </div>
+          <div class="wave" id="wave"></div>
+          <div style="min-width:130px">
+            <div class="time"><span id="tcur">02:14</span> / <span id="tot">06:11</span></div>
+            <div class="pbar"><i id="pbar"></i></div>
+          </div>
+          <button class="dl">⤓ MP3</button>
+          <button class="x" id="closeDock" title="Fechar player">✕</button>
+        </div>
+
+        <!-- chat input -->
+        <div class="chatbar">
+          <span class="hint">Enter envia</span>
+          <input id="ask" placeholder="Pergunte ou peça resumo de capítulo — ex: O que é ELBO em VAEs?" autocomplete="off">
+          <button class="send" id="send">Perguntar</button>
+        </div>
+
+        <!-- sessão / histórico (U4) -->
+        <div class="scrim hidden" id="scrim"></div>
+        <aside class="drawer hidden" id="drawer">
+          <div class="drawer-head"><b>Sessão</b><button id="closeDrawer" title="Fechar">✕</button></div>
+          <div class="turns">
+            <div class="turn cur">
+              <b>O que é ELBO em VAEs?</b>
+              <span>Cap 4 · 14:02 · resumo + roteiro + áudio (6:11)</span>
+            </div>
+            <div class="turn">
+              <b>GANs vs Diffusion</b>
+              <span>Cap 3 · 13:48 · resumo</span>
+            </div>
+            <div class="turn">
+              <b>Resuma o Cap 4</b>
+              <span>Cap 4 · 13:31 · resumo</span>
+            </div>
+          </div>
+          <div class="drawer-foot">
+            <button>⤓ Exportar .md</button>
+            <button>Limpar sessão</button>
+          </div>
+        </aside>
+
+      </div>
+    </div>
+    <p style="font-size:11.5px;color:var(--muted);max-width:760px;margin:10px auto 0;text-align:center">
+      Observação: no Streamlit o campo de pergunta é fixado no rodapé; o mock reproduz esse comportamento.
+      A pergunta atual fica visível no card acima — daí o “✎”.
+    </p>
+  </section>
+
+  <!-- ===================== VIEW: ANTES × DEPOIS ===================== -->
+  <section id="view-compare" class="hidden">
+    <div class="frame">
+      <div class="compare">
+        <div class="col">
+          <h3>Antes (hoje) <span class="pill now">8 controles · 2 abas · 4 ações</span></h3>
+          <div class="before">
+            <div class="sb">
+              <h4>⚓ Sidebar</h4>
+              <label>Escopo</label><div class="field">Livro todo <span>▾</span></div>
+              <label>Persona</label><div class="field">tecnico_direto <span>▾</span></div>
+              <div class="tog"><span>Modo offline (cache demo)</span><span class="switch"></span></div>
+              <div class="tog"><span>Usar cache (texto+áudio)</span><span class="switch on"></span></div>
+              <div class="tog"><span>Re-rank (cross-encoder)</span><span class="switch"></span></div>
+              <label>Estratégia</label><div class="field">vectorless <span>▾</span></div>
+              <div class="tog"><span>Voz premium (OpenRouter TTS)</span><span class="switch"></span></div>
+              <div class="expander">▸ Mapa do livro (nível 1)</div>
+              <span class="pin" style="left:164px; top:8px">2</span>
+              <span class="pin" style="left:164px; top:82px">3</span>
+              <span class="pin" style="left:164px; top:150px">5</span>
+            </div>
+            <div class="main">
+              <div class="title">Books to Audio — Generative Deep Learning</div>
+              <div class="info">Digite uma pergunta no campo abaixo — ex: <b>O que é ELBO em VAEs?</b> · <b>Explique GANs vs Diffusion</b> · <b>Resuma o Cap 4</b></div>
+              <div class="expander2">▸ Chunks recuperados (5) — ver fontes</div>
+              <div class="tabs"><div class="tab on">Pass1 · resumo técnico</div><div class="tab">Pass2 · roteiro TTS</div></div>
+              <div class="void">Nada gerado ainda.</div>
+              <div class="btn">Gerar resumo</div>
+              <div class="btn dis" style="margin-left:6px">Gerar áudio (5-8min)</div>
+              <div class="chat">Pergunte ou peça resumo de capítulo — ex: O que é ELBO em VAEs?</div>
+
+              <span class="pin" style="left:205px; top:44px">1</span>
+              <span class="pin" style="left:215px; top:148px">4</span>
+              <span class="pin" style="left:96px; top:212px">6</span>
+            </div>
+          </div>
+          <ul class="legend">
+            <li><b>1</b> Sem histórico: nova pergunta apaga resumo, roteiro e áudio.</li>
+            <li><b>2</b> 7 controles permanentes; 4 toggles, 1 sem efeito.</li>
+            <li><b>3</b> “Modo offline” não implementa nada (B1).</li>
+            <li><b>4</b> Duas abas escondem metade do fluxo e as ações.</li>
+            <li><b>5</b> Jargão de engenheiro na cara da plateia.</li>
+            <li><b>6</b> CTA promete 5-8 min; 15.000 chars dão ~16 min.</li>
+          </ul>
+        </div>
+
+        <div class="col">
+          <h3>Depois (proposta) <span class="pill next">3 controles · sem abas · 2 ações</span></h3>
+          <div class="after">
+            <div class="mini-head">
+              <div><b>Generative Deep Learning</b><br><span>Pergunte, leia o resumo ou ouça o capítulo</span></div>
+              <span>Cap 4 ▾ · Técnico ▾ · ☰</span>
+            </div>
+            <div class="mini-rail">
+              <span class="done">● Pergunta</span> ─ <span class="done">● Fontes</span> ─
+              <span class="done">● Resumo</span> ─ <span class="done">● Roteiro</span> ─
+              <span style="color:var(--accent);font-weight:700">● Áudio</span>
+            </div>
+            <div class="mini-body">
+              <div>
+                <div class="mini-card">
+                  <b>“O que é ELBO em VAEs?” <span>✎</span></b>
+                  <p>Cap 4 · p.96–112 · 10 trechos · instantâneo</p>
+                </div>
+                <div class="mini-card">
+                  <b>▸ Fontes (10 trechos) <span>detalhes</span></b>
+                  <p>Cap 4 · p.96–112 · sumário navegável</p>
+                </div>
+                <div class="mini-card">
+                  <b>RESUMO TÉCNICO <span>gerado agora</span></b>
+                  <p>O ELBO é um limite inferior para a log-verossimilhança… [Cap 4, p.101]</p>
+                </div>
+                <div class="mini-card">
+                  <b>ROTEIRO FALADO <span>≈6 min</span></b>
+                  <p>Vamos entender o ELBO sem fórmula decorada…</p>
+                </div>
+              </div>
+              <div>
+                <div class="mini-cta">▶ Ouvir<br><span style="font-weight:400">resumo + roteiro + áudio</span><br><span style="font-weight:400">≈6 min · grátis</span></div>
+                <div class="mini-ghost">Só o resumo</div>
+                <div class="mini-ghost">Só o roteiro</div>
+                <div style="font-size:8.5px;color:var(--muted);margin-top:8px;line-height:1.5">Cap 4 · Técnico<br>Busca: sumário navegável<br><span style="color:var(--primary)">Ajustar →</span></div>
+              </div>
+            </div>
+            <div class="mini-dock"><span class="dotp">▶</span> ELBO em VAEs <span style="margin-left:auto">02:14 / 06:11 · ⤓ MP3</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="changes">
+        <div class="change"><b>1 · Uma jornada</b><span>Pergunta → Fontes → Resumo → Roteiro → Áudio, sempre visível.</span></div>
+        <div class="change"><b>2 · 2 ações até o áudio</b><span>Digitar + “▶ Ouvir”. O resto é timeline, não aba.</span></div>
+        <div class="change"><b>3 · Estado honesto</b><span>Sem toggle morto; cache dito em humano; custo no botão.</span></div>
+        <div class="change"><b>4 · Prova do RAG legível</b><span>Card por fonte com página, tipo, relevância e trecho.</span></div>
+        <div class="change"><b>5 · Leitura confortável</b><span>Medida ≤ 76 ch, contraste AA, dark/light testados.</span></div>
+        <div class="change"><b>6 · Jargão atrás de “Avançado”</b><span>Vectorless/cross-encoder/cache saem da tela principal.</span></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== VIEW: COMPONENTES ===================== -->
+  <section id="view-system" class="hidden">
+    <div class="frame">
+      <div class="system">
+
+        <div class="sys-block">
+          <h3>Cores semânticas</h3>
+          <div class="swatches">
+            <div class="sw"><div class="chipcolor" style="background:var(--bg);border-bottom:1px solid var(--border)"></div><div class="txt"><b>bg</b><span>fundo</span></div></div>
+            <div class="sw"><div class="chipcolor" style="background:var(--surface);border-bottom:1px solid var(--border)"></div><div class="txt"><b>surface</b><span>card</span></div></div>
+            <div class="sw"><div class="chipcolor" style="background:var(--alt)"></div><div class="txt"><b>alt</b><span>hover</span></div></div>
+            <div class="sw"><div class="chipcolor" style="background:var(--primary)"></div><div class="txt"><b>primary</b><span>CTA</span></div></div>
+            <div class="sw"><div class="chipcolor" style="background:var(--accent)"></div><div class="txt"><b>accent</b><span>áudio</span></div></div>
+            <div class="sw"><div class="chipcolor" style="background:var(--success)"></div><div class="txt"><b>success</b><span>pronto</span></div></div>
+            <div class="sw"><div class="chipcolor" style="background:var(--warning)"></div><div class="txt"><b>warning</b><span>limite</span></div></div>
+            <div class="sw"><div class="chipcolor" style="background:var(--error)"></div><div class="txt"><b>error</b><span>falha</span></div></div>
+          </div>
+        </div>
+
+        <div class="sys-block">
+          <h3>Tipografia (medida ≤ 76 ch)</h3>
+          <div class="type-row"><div class="sample" style="font-size:26px;font-weight:700;letter-spacing:-.01em">Generative Deep Learning</div><div class="meta">display 30/38 · 600</div></div>
+          <div class="type-row"><div class="sample" style="font-size:19px;font-weight:650">Resumo técnico</div><div class="meta">seção 20/28 · 600</div></div>
+          <div class="type-row"><div class="sample" style="font-size:15px;line-height:1.7;max-width:68ch">O ELBO é um limite inferior para a log-verossimilhança dos dados e depende de duas parcelas: reconstrução e divergência.</div><div class="meta">corpo 16/26 · 400</div></div>
+          <div class="type-row"><div class="sample" style="font-size:11.5px;color:var(--muted)">gerado agora · 22 s · voz Pedro · ≈6 min</div><div class="meta">metadados 13/18</div></div>
+        </div>
+
+        <div class="sys-block">
+          <h3>Botões, chips e estados</h3>
+          <div class="demo-row" style="margin-bottom:12px">
+            <button class="cta" style="max-width:260px">▶ Ouvir<small>resumo + roteiro + áudio · ≈6 min · grátis</small></button>
+            <button class="btn-ghost">Só o resumo técnico</button>
+            <button class="btn-ghost" style="opacity:.5;cursor:not-allowed">Regerar áudio<small>sem roteiro</small></button>
+            <button class="chip">O que é ELBO em VAEs?</button>
+          </div>
+          <div class="demo-row">
+            <span class="badge ok">✓ pronto</span>
+            <span class="badge mut">instantâneo (já gerado)</span>
+            <span class="badge mut">gerado agora · 22 s</span>
+            <span class="badge warn">! roteiro longo</span>
+            <span class="badge err">✕ não respondeu</span>
+          </div>
+        </div>
+
+        <div class="sys-block">
+          <h3>Cards</h3>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+            <div class="card">
+              <div class="card-head"><h2>Resumo técnico</h2><div class="card-tools"><span class="prov">gerado agora · 22 s</span><button class="tool">⧉</button><button class="tool">⤓</button><button class="tool">↻</button></div></div>
+              <div class="read-body" style="font-size:13px">Texto com citações <span class="cite">[Cap 4, p.101]</span> e equações em bloco. Ações de conteúdo ficam no cabeçalho.</div>
+            </div>
+            <div class="card error-card">
+              <div class="card-head"><h2>Falha com saída</h2><span class="prov">quota</span></div>
+              <p>A voz premium não respondeu.</p>
+              <div class="error-actions"><button class="btn-primary-sm">Gerar com a voz grátis (Edge)</button><button class="btn-ghost">Detalhes</button></div>
+            </div>
+            <div class="src" style="background:var(--surface)">
+              <div class="top"><span class="cit">[Cap 4, p.101] · Variational Autoencoders</span><span class="type">texto</span></div>
+              <div class="rel"><span class="bar"><i style="width:87%"></i></span> 0,87 relevância</div>
+              <div class="snip" style="display:block">“…the ELBO is a lower bound on the log-likelihood of the data…”</div>
+            </div>
+            <div class="card" style="display:flex;gap:12px;align-items:center">
+              <div style="width:38px;height:38px;border-radius:50%;background:var(--accent);color:var(--on-accent);display:grid;place-items:center">▶</div>
+              <div style="flex:1"><b style="font-size:12.5px">ELBO em VAEs</b><div style="font-size:11px;color:var(--muted)">Pedro · Edge · 06:11</div><div class="pbar"><i style="width:31%;background:var(--accent)"></i></div></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sys-block">
+          <h3>Microcopy: antes → depois</h3>
+          <table class="micro">
+            <tr><th>Hoje</th><th>Proposta</th></tr>
+            <tr><td>Escopo / Persona</td><td>Onde buscar / Explicar para (Técnico · Iniciante)</td></tr>
+            <tr><td>Modo offline (cache demo)</td><td>removido até existir fallback real</td></tr>
+            <tr><td>Usar cache (texto+áudio)</td><td>Ignorar cache (forçar nova geração)</td></tr>
+            <tr><td>Re-rank (cross-encoder)</td><td>Reordenar resultados</td></tr>
+            <tr><td>Estratégia: vectorless</td><td>Como buscar: Sumário navegável (padrão)</td></tr>
+            <tr><td>Chunks recuperados (5)</td><td>Fontes (10 trechos)</td></tr>
+            <tr><td>Nada gerado ainda.</td><td>Gere o resumo técnico · ≈15 s</td></tr>
+            <tr><td>Gerar áudio (5-8min)</td><td>▶ Ouvir (≈6 min, calculado)</td></tr>
+            <tr><td>via `cache` · do cache</td><td>instantâneo (já gerado nesta máquina)</td></tr>
+            <tr><td>Nada encontrado neste escopo.</td><td>Nada neste capítulo. [Buscar no livro todo]</td></tr>
+          </table>
+        </div>
+
+        <div class="sys-block">
+          <h3>Acessibilidade (checklist de aceite)</h3>
+          <ul class="checklist">
+            <li>Contraste AA em light e dark</li>
+            <li>Alvos de toque ≥ 44 px</li>
+            <li>Foco visível em todos os interativos</li>
+            <li>Estado nunca só por cor (●/◐/○ + texto)</li>
+            <li>Zoom 200% sem scroll horizontal</li>
+            <li>Fluxo completo só com teclado</li>
+            <li>Sem CDN (fonte/ícone/JS externos)</li>
+            <li>Áudio com transcrição visível (o roteiro)</li>
+          </ul>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  var app = document.getElementById('app');
+  var els = {
+    empty: document.getElementById('empty'),
+    q: document.getElementById('qcard'),
+    src: document.getElementById('srcblock'),
+    p1: document.getElementById('p1'),
+    p2: document.getElementById('p2'),
+    err: document.getElementById('err'),
+    dock: document.getElementById('dock'),
+    status: document.getElementById('status'),
+    timer: document.getElementById('timer'),
+    simNote: document.getElementById('simNote'),
+    ask: document.getElementById('ask')
+  };
+  var views = {
+    app: document.getElementById('view-app'),
+    compare: document.getElementById('view-compare'),
+    system: document.getElementById('view-system')
+  };
+  var LABELS = {pergunta:'Pergunta', fontes:'Fontes', resumo:'Resumo', roteiro:'Roteiro', audio:'Áudio'};
+  var ORDER = ['pergunta','fontes','resumo','roteiro','audio'];
+  var SYM = {done:'●', active:'◐', locked:'○', error:'✕'};
+  var timers = [];
+  var tick = null;
+  var question = '';
+
+  /* bolinhas da onda */
+  (function(){
+    var w = document.getElementById('wave');
+    for (var i=0;i<44;i++){
+      var bar = document.createElement('i');
+      bar.style.height = (6 + Math.round(Math.random()*18)) + 'px';
+      w.appendChild(bar);
+    }
+  })();
+
+  function clearTimers(){
+    timers.forEach(clearTimeout); timers = [];
+    if (tick) { clearInterval(tick); tick = null; }
+  }
+
+  function setStages(map){
+    ORDER.forEach(function(k){
+      var el = document.querySelector('[data-st="'+k+'"]');
+      if (!el) return;
+      var st = map[k] || 'locked';
+      el.className = 'st ' + st;
+      el.innerHTML = '<span class="sy">' + SYM[st] + '</span><span class="lbl">' + LABELS[k] + '</span>';
+    });
+  }
+
+  function showOne(el, on){ el.classList.toggle('hidden', !on); }
+
+  function hideAll(){
+    showOne(els.empty, false); showOne(els.q, false); showOne(els.src, false);
+    showOne(els.p1, false); showOne(els.p2, false); showOne(els.err, false);
+    showOne(els.dock, false); showOne(els.status, false);
+  }
+
+  function setP1(mode){ /* 'full' | 'empty' */
+    var full = els.p1.querySelector('.full');
+    var ph = els.p1.querySelector('.ph');
+    showOne(full, mode === 'full');
+    showOne(ph, mode !== 'full');
+  }
+  function setP2(mode){
+    var full = els.p2.querySelector('.full');
+    var ph = els.p2.querySelector('.ph');
+    showOne(full, mode === 'full');
+    showOne(ph, mode !== 'full');
+  }
+
+  function askValue(v){ if (els.ask) els.ask.value = v; }
+  function setQuestion(text){
+    if (text) question = text;
+    if (!question) question = 'O que é ELBO em VAEs?';
+    askValue(question);
+    var qt = document.getElementById('qtext');
+    if (qt) qt.textContent = question;
+    var dt = document.getElementById('dockTitle');
+    if (dt) dt.textContent = question.length > 32 ? question.slice(0, 32) + '…' : question;
+  }
+  function stopClock(){ if (tick){ clearInterval(tick); tick = null; } }
+
+  /* ---------- cenários ---------- */
+  function scStart(){
+    hideAll(); showOne(els.empty, true);
+    setStages({pergunta:'active'});
+    question = ''; askValue('');
+  }
+
+  function scSearch(text){
+    hideAll(); showOne(els.q, true); showOne(els.status, true);
+    setStages({pergunta:'done', fontes:'active'});
+    setQuestion(text);
+    var steps = els.status.querySelectorAll('.step');
+    steps.forEach(function(s){ s.className = 'step'; s.querySelector('.dot').textContent=''; });
+    var first = els.status.querySelector('[data-step="fontes"]');
+    first.classList.add('run');
+    startClock();
+  }
+
+  function scSources(text){
+    stopClock();
+    hideAll();
+    showOne(els.q, true); showOne(els.src, true); showOne(els.p1, true);
+    els.src.open = true;
+    setP1('empty');
+    setStages({pergunta:'done', fontes:'done', resumo:'active'});
+    setQuestion(text);
+  }
+
+  function scP1(text){
+    stopClock();
+    hideAll();
+    showOne(els.q, true); showOne(els.src, true); showOne(els.p1, true);
+    setP1('full');
+    document.getElementById('p1prov').textContent = 'gerado agora · 22 s';
+    setStages({pergunta:'done', fontes:'done', resumo:'done', roteiro:'active'});
+    setQuestion(text);
+  }
+
+  function scP2(text){
+    stopClock();
+    hideAll();
+    showOne(els.q, true); showOne(els.src, true); showOne(els.p1, true); showOne(els.p2, true);
+    setP1('full'); setP2('full');
+    setStages({pergunta:'done', fontes:'done', resumo:'done', roteiro:'done', audio:'active'});
+    setQuestion(text);
+  }
+
+  function scReady(text){
+    stopClock();
+    hideAll();
+    showOne(els.q, true); showOne(els.src, true); showOne(els.p1, true);
+    showOne(els.p2, true); showOne(els.dock, true);
+    setP1('full'); setP2('full');
+    setStages({pergunta:'done', fontes:'done', resumo:'done', roteiro:'done', audio:'done'});
+    setQuestion(text);
+  }
+
+  function scError(){
+    stopClock();
+    hideAll(); showOne(els.q, true); showOne(els.err, true);
+    setStages({pergunta:'done', fontes:'error'});
+  }
+
+  /* ---------- fluxo animado ---------- */
+  function startClock(){
+    var s = 0;
+    if (tick) clearInterval(tick);
+    els.timer.textContent = '0 s';
+    tick = setInterval(function(){ s++; els.timer.textContent = s + ' s'; }, 1000);
+  }
+
+  function markStep(name, state){
+    var el = els.status.querySelector('[data-step="'+name+'"]');
+    if (!el) return;
+    el.classList.remove('run');
+    if (state === 'done'){ el.classList.add('done'); el.querySelector('.dot').textContent = '✓'; }
+    if (state === 'run'){ el.classList.add('run'); el.querySelector('.dot').textContent = ''; }
+  }
+
+  function runFlow(){
+    clearTimers();
+    scSearch();
+    timers.push(setTimeout(function(){ markStep('fontes','done'); markStep('resumo','run'); }, 750));
+    timers.push(setTimeout(function(){
+      hideAll(); showOne(els.q, true); showOne(els.src, true); showOne(els.p1, true);
+      setP1('full'); setStages({pergunta:'done', fontes:'done', resumo:'done', roteiro:'active'});
+      showOne(els.status, true);
+      markStep('fontes','done'); markStep('resumo','done'); markStep('roteiro','run');
+    }, 1500));
+    timers.push(setTimeout(function(){
+      showOne(els.p2, true); setP2('full');
+      setStages({pergunta:'done', fontes:'done', resumo:'done', roteiro:'done', audio:'active'});
+      markStep('roteiro','done'); markStep('audio','run');
+    }, 2250));
+    timers.push(setTimeout(function(){
+      clearInterval(tick); tick = null;
+      scReady();
+    }, 3000));
+  }
+
+  function runP1(){
+    clearTimers(); scSearch();
+    timers.push(setTimeout(function(){ scP1(); }, 900));
+  }
+  function runP2(){
+    clearTimers(); scSearch();
+    timers.push(setTimeout(function(){ scSources(); }, 700));
+    timers.push(setTimeout(function(){ scP2(); }, 1500));
+  }
+
+  /* ---------- navegação do mock ---------- */
+  function showView(name){
+    Object.keys(views).forEach(function(k){ showOne(views[k], k === name); });
+  }
+
+  function setScenario(name, opts){
+    opts = opts || {};
+    var btnName = name;
+    if (name === 'dark'){
+      document.documentElement.dataset.theme = 'dark';
+      name = 'ready';
+    }
+    app.classList.toggle('in-phone', name === 'mobile');
+    app.classList.toggle('present', name === 'present');
+    openDrawer(false);
+    document.querySelectorAll('[data-s]').forEach(function(b){
+      b.classList.toggle('on', b.dataset.s === btnName);
+    });
+    if (name === 'compare'){ showView('compare'); return; }
+    if (name === 'system'){ showView('system'); return; }
+    showView('app');
+    clearTimers();
+
+    switch(name){
+      case 'start': scStart(); break;
+      case 'search': scSearch(opts.text); break;
+      case 'sources': scSources(opts.text); break;
+      case 'p1': scP1(opts.text); break;
+      case 'p2': scP2(opts.text); break;
+      case 'ready': scReady(opts.text); break;
+      case 'error': scError(); break;
+      case 'mobile': scReady(); break;
+      case 'present': scReady(); break;
+    }
+  }
+
+  /* ---------- eventos ---------- */
+  document.getElementById('scenarios').addEventListener('click', function(e){
+    var b = e.target.closest('button[data-s]');
+    if (!b) return;
+    setScenario(b.dataset.s);
+  });
+
+  document.getElementById('listen').addEventListener('click', runFlow);
+  document.getElementById('onlyP1').addEventListener('click', runP1);
+  document.getElementById('onlyP2').addEventListener('click', runP2);
+  document.getElementById('retryScope').addEventListener('click', function(){
+    runFlow();
+  });
+  document.getElementById('send').addEventListener('click', function(){
+    var v = els.ask.value.trim();
+    setScenario('search', {text: v || undefined});
+    runFlow();
+  });
+  els.ask.addEventListener('keydown', function(e){
+    if (e.key === 'Enter'){ e.preventDefault(); document.getElementById('send').click(); }
+  });
+  document.querySelectorAll('[data-chip]').forEach(function(c){
+    c.addEventListener('click', function(){
+      askValue(c.dataset.chip);
+      setScenario('search', {text: c.dataset.chip});
+      runFlow();
+    });
+  });
+  document.getElementById('openAdv').addEventListener('click', function(){
+    var d = document.getElementById('adv');
+    d.open = true;
+    d.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+  document.getElementById('genP1').addEventListener('click', runP1);
+  document.getElementById('genP2').addEventListener('click', runP2);
+  document.getElementById('editQ').addEventListener('click', function(){
+    els.ask.focus();
+    els.ask.scrollIntoView({behavior:'smooth', block:'center'});
+  });
+
+  /* sessão / histórico */
+  function openDrawer(on){
+    showOne(document.getElementById('drawer'), on);
+    showOne(document.getElementById('scrim'), on);
+  }
+  document.getElementById('sessBtn').addEventListener('click', function(){ openDrawer(true); });
+  document.getElementById('closeDrawer').addEventListener('click', function(){ openDrawer(false); });
+  document.getElementById('scrim').addEventListener('click', function(){ openDrawer(false); });
+  document.querySelectorAll('.turn').forEach(function(t){
+    t.addEventListener('click', function(){ openDrawer(false); });
+  });
+
+  /* player fake */
+  var playing = false;
+  var playBtn = document.getElementById('playBtn');
+  var wave = document.getElementById('wave');
+  document.getElementById('playBtn').addEventListener('click', function(){
+    playing = !playing;
+    playBtn.textContent = playing ? '❚❚' : '▶';
+    wave.classList.toggle('playing', playing);
+  });
+  document.getElementById('closeDock').addEventListener('click', function(){
+    showOne(els.dock, false);
+    playing = false; playBtn.textContent = '▶'; wave.classList.remove('playing');
+  });
+
+  /* tema */
+  document.getElementById('themeBtn').addEventListener('click', function(){
+    var html = document.documentElement;
+    html.dataset.theme = html.dataset.theme === 'dark' ? 'light' : 'dark';
+  });
+
+  /* reset */
+  document.getElementById('resetBtn').addEventListener('click', function(){
+    setScenario('start');
+  });
+
+  /* inicial */
+  setScenario('start');
+})();
+</script>
+</body>
+</html>
