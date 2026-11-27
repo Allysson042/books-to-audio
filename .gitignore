@@ -4,5 +4,6 @@ __pycache__/
 .storage/
 storage/
 cache/
+static/
 data/*.pdf
 .env

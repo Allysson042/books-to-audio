@@ -1,0 +1,28 @@
+# Tema — contrato visual em docs/UX/06-guia-visual.md §3/§6.
+# Sem `base`: o app segue a preferência claro/escuro do SO/navegador (menu do Streamlit também troca).
+
+[theme]
+primaryColor = "#0E6F63"
+backgroundColor = "#FBFAF7"
+secondaryBackgroundColor = "#F2EFE9"
+textColor = "#1B1A17"
+font = "sans-serif"
+codeFont = "monospace"
+
+[theme.light]
+primaryColor = "#0E6F63"
+backgroundColor = "#FBFAF7"
+secondaryBackgroundColor = "#F2EFE9"
+textColor = "#1B1A17"
+
+[theme.dark]
+primaryColor = "#4FD1BD"
+backgroundColor = "#12110F"
+secondaryBackgroundColor = "#1A1917"
+textColor = "#EDEAE3"
+
+[browser]
+gatherUsageStats = false
+
+[server]
+enableStaticServing = true

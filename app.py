@@ -1,6 +1,9 @@
-"""MVP Streamlit: chat + escopo + persona + debug RAG + áudio."""
+"""MVP Streamlit: pergunta → fontes → resumo → roteiro → áudio (U1)."""
+import hashlib
 import json
 import logging
+import os
+import time
 from pathlib import Path
 
 # Silencia o file-watcher fuçando submódulos de visão do `transformers`
@@ -15,9 +18,10 @@ from src.markdown_math import render_mixed
 from src.retrieval import RAGStore, Reranker
 from src.retrieval_tree import TreeStore
 from src.tts_provider import clean_for_speech, synthesize, synthesize_premium
+from src.ui import actions, copy, history, player, sources, stages, theme
 
-st.set_page_config(page_title="Books to Audio — GDL", layout="wide")
-st.title("Books to Audio — Generative Deep Learning")
+st.set_page_config(page_title=copy.PAGE_TITLE, page_icon=copy.PAGE_ICON, layout="wide")
+theme.inject(st)
 
 # -- contexto hierárquico (nível 1: mapa; nível 2: macro do cap em foco) ------
 CACHE = Path("cache")
@@ -35,29 +39,66 @@ def _macro(chapter: int) -> str | None:
     return None
 
 
-def _badge(provider: str, cached: bool) -> str:
-    return f"via `{provider}`" + (" · do cache" if cached else " · recém-gerado")
+# -- header (U2): título + escopo + persona + sessão + ajustes, sem sidebar ---
+scope_opts = ([copy.SCOPE_ALL]
+              + [f"Cap {c['chapter']} · {c['title']}" for c in MAPA["chapters"]])
+SCOPE_TO_CHAPTER = {f"Cap {c['chapter']} · {c['title']}": c["chapter"]
+                    for c in MAPA["chapters"]}
+
+head_l, head_c, head_p, head_s, head_g = st.columns([4.7, 2.1, 1.6, 1.1, 1.3],
+                                                    vertical_alignment="bottom")
+with head_l:
+    st.title(copy.TITLE)
+    st.caption(copy.SUBTITLE)
+    if not MAPA["chapters"]:
+        st.warning(copy.MAPA_MISSING)
+with head_c:
+    scope = st.selectbox(copy.SCOPE_LABEL, scope_opts or [copy.SCOPE_ALL],
+                         label_visibility="collapsed", key="ui_scope")
+with head_p:
+    persona_label = st.selectbox(copy.PERSONA_LABEL, list(copy.PERSONA_OPTIONS),
+                                 label_visibility="collapsed", key="ui_persona")
+with head_s:
+    ph_sess = st.empty()  # ☰ Sessão: preenchido no fim (já com o turno do run)
+with head_g:
+    with st.popover(copy.ADVANCED_LABEL):
+        strategy_label = st.selectbox(copy.STRATEGY_LABEL, list(copy.STRATEGY_OPTIONS),
+                                      key="ui_strategy")
+        strategy = copy.STRATEGY_OPTIONS[strategy_label]
+        use_rerank = False
+        if strategy == "vetorial":
+            use_rerank = st.checkbox(copy.RERANK_LABEL, value=False,
+                                     help=copy.RERANK_HELP, key="ui_rerank")
+        ignore_cache = st.toggle(copy.IGNORE_CACHE_LABEL, value=False,
+                                 help=copy.IGNORE_CACHE_HELP, key="ui_ignore_cache")
+        has_premium_key = bool(os.getenv("OPENROUTER_API_KEY"))
+        premium_voice = st.toggle(copy.PREMIUM_LABEL, value=False,
+                                  disabled=not has_premium_key, key="ui_premium")
+        if not has_premium_key:
+            st.caption(copy.PREMIUM_NO_KEY)
+            premium_voice = False
+        present = st.toggle(copy.PRESENT_LABEL, value=False, key="ui_present")
+        st.divider()
+        with st.expander(copy.MAP_LABEL.format(n=len(MAPA["chapters"]))):
+            with st.container(height=260):
+                for c in MAPA["chapters"]:
+                    st.markdown(f"**Cap {c['chapter']}** — {c['title']}")
+                    st.caption(c.get("summary_2lines", ""))
+
+use_cache = not ignore_cache
+persona = copy.PERSONA_OPTIONS[persona_label]
+chapter = SCOPE_TO_CHAPTER.get(scope)
+
+# U5: modo apresentação (toggle em ⚙ Ajustes). O tema dark não é forçado por
+# sessão (o Streamlit não permite); é escolha do SO ou do menu do app.
+present = st.session_state.get("ui_present", False)
+if present:
+    theme.inject_present(st)
 
 
-# -- sidebar ------------------------------------------------------------------
-scope_opts = ["Livro todo"] + [f"Cap {c['chapter']}: {c['title']}" for c in MAPA["chapters"]]
-scope = st.sidebar.selectbox("Escopo", scope_opts or ["Livro todo"])
-persona = st.sidebar.selectbox("Persona", ["tecnico_direto", "iniciante_guiado"])
-offline = st.sidebar.toggle("Modo offline (cache demo)", value=False)
-use_cache = st.sidebar.toggle("Usar cache (texto+áudio)", value=True,
-                              help="OFF = ignora a leitura do cache e gera de novo (escrita continua).")
-use_rerank = st.sidebar.toggle("Re-rank (cross-encoder)", value=False,
-                               help="OFF = usa o top-5 direto do RRF. Compare os dois modos.")
-strategy = st.sidebar.selectbox("Estratégia", ["vectorless", "vetorial" ],
-                                help="vectorless = LLM navega no sumário (árvore), sem vetores.")
-premium_voice = st.sidebar.toggle("Voz premium (OpenRouter TTS)", value=False,
-                                  help="ON = sintetiza via OpenRouter (pago, ~$0,06/áudio). OFF = Edge-TTS grátis.")
-chapter = int(scope.split(":")[0].replace("Cap", "")) if scope != "Livro todo" else None
-
-with st.sidebar.expander("Mapa do livro (nível 1)"):
-    for c in MAPA["chapters"]:
-        st.markdown(f"**Cap {c['chapter']}** — {c['title']}")
-        st.caption(c.get("summary_2lines", ""))
+def _exit_present() -> None:
+    """Callback: desliga o modo antes do rerun (widget já instanciado)."""
+    st.session_state["ui_present"] = False
 
 # -- recursos (cache) ----------------------------------------------------------
 @st.cache_resource
@@ -75,12 +116,44 @@ def _treestore() -> TreeStore:
     return TreeStore()
 
 
+# -- voz e assinatura do áudio (U6) --------------------------------------------
+def _voice_for(persona_name: str, premium: bool) -> str:
+    meta = load_persona(persona_name)
+    base = meta.get("tts_voice", "pt-BR-FranciscaNeural")
+    if not premium:
+        return base
+    return os.getenv("OPENROUTER_TTS_VOICE", "") or meta.get("tts_voice_openrouter", base)
+
+
+def _audio_sig(text: str, voice: str) -> str:
+    """sha1(voz + tamanho + início + fim): troca de roteiro/voz invalida o player."""
+    raw = f"{voice}|{len(text)}|{text[:200]}|{text[-200:]}"
+    return hashlib.sha1(raw.encode("utf-8")).hexdigest()
+
+
+def _valid_audio(text: str | None, voice: str) -> Path | None:
+    """Só devolve o MP3 quando é do roteiro+voz atuais e existe no disco."""
+    stored = st.session_state.get("mp3")
+    if not (text and stored):
+        return None
+    path = Path(stored)
+    if not path.exists():
+        return None
+    if st.session_state.get("mp3_sig") != _audio_sig(text, voice):
+        return None
+    return path
+
+
+# migração de sessão antiga (mp3 sem assinatura = órfão)
+if "mp3" in st.session_state and "mp3_sig" not in st.session_state:
+    st.session_state.pop("mp3", None)
+
 # -- busca --------------------------------------------------------------------
 # `chat_input` só devolve texto no rerun do submit (trocar de aba do navegador ou
 # perder o foco não comita texto parcial). Precisa ficar no corpo principal:
 # dentro de tabs/columns/expander ele quebra o layout (fixa no rodapé do container).
 submitted = st.chat_input(
-    placeholder="Pergunte ou peça resumo de capítulo — ex: O que é ELBO em VAEs?",
+    placeholder=copy.ASK_PLACEHOLDER,
     max_chars=config.MAX_QUERY_CHARS, key="q_input")
 if submitted and submitted.strip():
     st.session_state["query"] = submitted.strip()
@@ -89,169 +162,399 @@ if submitted and submitted.strip():
 query = st.session_state.get("query", "")
 
 # resultados de outro contexto (query/escopo/persona/rerank/estratégia) não valem mais
-ctx = (query, scope, persona, use_rerank, strategy)
+# (re-rank só entra no ctx no vetorial: alterná-lo no vectorless não rebusca)
+ctx = (query, scope, persona, use_rerank if strategy == "vetorial" else None, strategy)
 if st.session_state.get("ctx") != ctx:
-    for k in ("pass1", "pass2", "mp3"):
+    for k in ("pass1", "pass2", "mp3", "mp3_sig", "mp3_engine", "ui_error", "audio_notice",
+              "top5", "cands", "ret_err"):
         st.session_state.pop(k, None)
     st.session_state["ctx"] = ctx
 
+# -- sessão (U4): ☰ no header; reabrir turno = só restaurar estado ------------
+def _restore_turn(turn: dict) -> None:
+    history.restore_state(turn, scope_opts)
+
+
+def _new_question() -> None:
+    history.clear_artifacts()
+    st.session_state["query"] = ""
+
+
+def _clear_session() -> None:
+    st.session_state["turns"] = []
+    history.clear_artifacts()
+    st.session_state["query"] = ""
+
+
+def _render_session() -> None:
+    """Painel ☰: turnos (mais recente primeiro) + novas ações. Sem chamada externa."""
+    turns = st.session_state.get("turns") or []
+    current = st.session_state.get("turn_current")
+    with ph_sess:
+        with st.popover(copy.SESSION_LABEL):
+            if not turns:
+                st.caption(copy.SESSION_EMPTY)
+            for turn in turns:
+                label = history.short_query(turn.get("query"))
+                if turn.get("id") == current:
+                    label = f"{copy.SESSION_CURRENT} {label}"
+                st.button(label, key=f"turn_{turn.get('id')}", width="stretch",
+                          on_click=_restore_turn, args=(turn,))
+                st.caption(history.turn_meta(turn))
+            st.divider()
+            st.button(copy.SESSION_NEW, key="session_new", width="stretch",
+                      on_click=_new_question)
+            st.download_button(copy.SESSION_EXPORT,
+                               data=history.export_markdown(turns),
+                               file_name=copy.SESSION_EXPORT_NAME,
+                               mime="text/markdown", key="session_export",
+                               disabled=not turns)
+            confirmed = st.checkbox(copy.SESSION_CONFIRM, key="session_confirm")
+            st.button(copy.SESSION_CLEAR, key="session_clear", width="stretch",
+                      disabled=not confirmed, on_click=_clear_session)
+
+
 if not query:
-    st.info("Digite uma pergunta no campo abaixo — ex: **O que é ELBO em VAEs?** · "
-            "**Explique GANs vs Diffusion** · **Resuma o Cap 4**")
+    _render_session()
+    with st.container(key="gdl_hero"):
+        st.subheader(copy.EMPTY_TITLE)
+        st.caption(copy.EMPTY_HELP)
+    with st.container(key="gdl_chips", horizontal=True, gap="small"):
+        for i, chip in enumerate(copy.EMPTY_CHIPS):
+            if st.button(chip, key=f"empty_chip_{i}", width="stretch"):
+                st.session_state["query"] = chip
+                st.rerun()
+    st.stop()
 
-if query:
-    q = query  # alias curto: mesma string de antes, chaves de cache de `src.generate` intactas
+# -- U5: linha de apresentação (chips de exemplo + saída), só no modo --------
+if present:
+    st.caption(copy.PRESENT_HINT)
+    with st.container(horizontal=True, gap="small"):
+        for i, chip in enumerate(copy.EMPTY_CHIPS):
+            if st.button(chip, key=f"present_chip_{i}"):
+                st.session_state["query"] = chip
+                st.rerun()
+        st.button(copy.PRESENT_EXIT, key="present_exit", on_click=_exit_present)
 
-    # busca memoizada por contexto: os `st.rerun()` dos botões não rebuscam (nem gastam LLM)
-    if st.session_state.get("ret_ctx") != ctx:
-        err = None
-        if strategy == "vectorless":
-            with st.spinner("Navegando na árvore (LLM escolhe as seções)..."):
+q = query  # alias curto: mesma string de antes, chaves de cache de `src.generate` intactas
+macro = _macro(chapter) if chapter is not None else None
+scope_str = str(chapter) if chapter else "all"
+addendum = load_persona(persona).get("system_addendum", "")
+edge_voice = load_persona(persona).get("tts_voice", "pt-BR-FranciscaNeural")
+voice_out = _voice_for(persona, premium_voice)
+
+# -- trilha (placeholder acima das colunas; preenchido após a busca) -----------
+ph_stages = st.empty()
+
+# -- layout: coluna de leitura e rail de ações (U5: coluna única no modo
+# apresentação — sem rail; a intenção vem dos cards) ---------------------------
+if present:
+    ph_run = st.empty()  # status inline, acima dos cards
+    left = st.container()
+    ph_rail = None
+else:
+    left, right = st.columns([2, 1], gap="medium")
+    with right:
+        with st.container(key="gdl_actions"):
+            ph_rail = st.empty()
+            ph_run = st.empty()
+with left:
+    with st.container(key="gdl_read"):
+        ph_status = st.empty()
+        ph_q = st.empty()
+        ph_src = st.empty()
+        ph_p1 = st.empty()
+        ph_p2 = st.empty()
+        ph_audio = st.empty()
+
+
+# -- trilha imediata (não espera a busca; re-renderizada depois) --------------
+stages.rail(q, st.session_state.get("top5") or [], st.session_state.get("pass1"),
+            st.session_state.get("pass2"),
+            _valid_audio((st.session_state.get("pass2") or {}).get("text"), voice_out),
+            err=st.session_state.get("ret_err"), target=ph_stages)
+
+# -- busca memoizada por contexto (nunca rebusca; nunca gasta LLM) -------------
+if st.session_state.get("ret_ctx") != ctx:
+    ret_err = None
+    t_search = time.monotonic()
+    with ph_status.container():
+        label = (copy.SEARCH_RUNNING_TREE if strategy == "vectorless"
+                 else copy.SEARCH_RUNNING_VECTOR)
+        with st.status(label, expanded=False) as box:
+            if strategy == "vectorless":
                 try:
                     top5 = _treestore().search(q, chapter=chapter, use_cache=use_cache)
                     cands = top5
                 except (RuntimeError, ValueError) as e:
-                    err = str(e)
+                    ret_err = str(e)
                     top5, cands = [], []
-        else:
-            with st.spinner("Recuperando chunks (Chroma + BM25 → RRF → re-rank)..."):
+            else:
                 cands = _store().search(q, chapter=chapter, top_n=config.RETRIEVAL_PREFETCH)
                 top5 = (_reranker().rerank(q, cands, top_n=config.RETRIEVAL_TOP_N)
                         if (cands and use_rerank) else cands[:config.RETRIEVAL_TOP_N])
-        st.session_state["ret_ctx"] = ctx
-        st.session_state["top5"] = top5
-        st.session_state["cands"] = cands
-        st.session_state["ret_err"] = err
+            box.update(state="error" if ret_err else "complete",
+                       label=copy.SEARCH_FAILED if ret_err else copy.SEARCH_DONE)
+    ph_status.empty()
+    st.session_state["ret_ctx"] = ctx
+    st.session_state["top5"] = top5
+    st.session_state["cands"] = cands
+    st.session_state["ret_err"] = ret_err
+    st.session_state["ret_elapsed"] = time.monotonic() - t_search
 
-    top5 = st.session_state["top5"]
-    cands = st.session_state.get("cands", top5)
-    if st.session_state.get("ret_err"):
-        st.error(st.session_state["ret_err"])
+top5 = st.session_state.get("top5", [])
+cands = st.session_state.get("cands", top5)
+ret_err = st.session_state.get("ret_err")
+has_sources = not ret_err and bool(top5)
 
-    if not top5:
-        st.warning("Nada encontrado neste escopo. Tente 'Livro todo'.")
-    else:
-        macro = _macro(chapter) if chapter is not None else None
-        sig = chunk_sig_of(top5)
-        addendum = load_persona(persona).get("system_addendum", "")
-        voice = load_persona(persona).get("tts_voice", "pt-BR-FranciscaNeural")
 
-        with st.expander(f"Chunks recuperados ({len(top5)}) — ver fontes", expanded=False):
-            for i, r in enumerate(top5, 1):
-                m = r["metadata"]
-                extra = (f"caminho `{r['tree_path']}`" if strategy == "vectorless"
-                         else f"re-rank `{f'{r['rerank']:.4f}' if r.get('rerank') is not None else '–'}`")
-                st.markdown(f"**{i}. {r['citation']}** · {m['section']} · `{m['type']}` · {extra}")
-            if strategy == "vectorless" and top5 and st.checkbox("Raciocínio da navegação"):
-                st.write(top5[0].get("thinking", ""))
-            pick = st.selectbox("Ver texto do chunk:",
-                                [f"{i}. {r['doc_id']}" for i, r in enumerate(top5, 1)])
-            st.write(top5[int(pick.split(".")[0]) - 1]["text"])
-            if st.checkbox("Debug RAG (tabela RRF top-20 → re-rank top-5)"):
-                st.dataframe(
-                    [{"doc_id": c["doc_id"], "citação": c["citation"],
-                      "rank_denso": str(c.get("dense_rank") or "–"),
-                      "rank_BM25": str(c.get("sparse_rank") or "–"),
-                      "RRF": f"{c['rrf']:.5f}" if c.get("rrf") is not None else "–",
-                  "re-rank": next((f"{t['rerank']:.4f}" for t in top5
-                                   if t["doc_id"] == c["doc_id"] and t.get("rerank") is not None), "–")}
-                     for c in cands],
-                    width="stretch")
-            if macro and st.checkbox(f"Resumo macro Cap {chapter} (nível 2)"):
-                st.markdown(macro[:3000] + ("…" if len(macro) > 3000 else ""))
-            st.caption(f"Query: {q!r} · escopo: {scope} · persona: {persona} · "
-                       f"estratégia: {strategy}"
-                       + (f" · re-rank: {'on' if use_rerank else 'off'}" if strategy == "vetorial" else "") + " · "
-                       f"offline: {offline} · cache: {'on' if use_cache else 'off'}")
+# -- pipeline (mesmas chamadas de antes, agora sem rerun cego) ------------------
+def _synth(text: str, force: bool = False) -> tuple[Path, str]:
+    """Premium com queda para Edge (mesma política de antes); nunca engole erro de Edge.
 
-        t1, t2 = st.tabs(["Pass1 · resumo técnico", "Pass2 · roteiro TTS"])
-        with t1:
-            p1 = st.session_state.get("pass1")
-            if p1:
-                st.caption(_badge(p1["provider"], p1["cached"]))
-                render_mixed(st, p1["text"])
-            else:
-                st.info("Nada gerado ainda.")
-            if st.button("Gerar resumo", type="primary"):
-                try:
-                    with st.spinner("Gerando Pass1 técnico..."):
-                        text, prov, cached = get_pass1(q, str(chapter) if chapter else "all",
-                                                       top5, macro, addendum, use_cache)
-                    st.session_state["pass1"] = {"text": text, "provider": prov,
-                                                 "cached": cached, "chunk_sig": sig}
-                    st.rerun()
-                except (RuntimeError, ValueError) as e:
-                    st.error(str(e))
+    `force=True` (↻ Regerar áudio) ignora o cache de áudio daquela voz.
+    """
+    read_cache = use_cache and not force
+    if premium_voice:
+        try:
+            mp3, engine, n = synthesize_premium(text, voice_out, use_cache=read_cache)
+            return Path(mp3), f"{engine} ({n} fatia(s))"
+        except RuntimeError:
+            st.session_state["audio_notice"] = copy.AUDIO_NOTICE_PREMIUM
+    mp3, engine = synthesize(text, edge_voice, read_cache)
+    return Path(mp3), engine
 
-        with t2:
-            p2 = st.session_state.get("pass2")
-            if p2:
-                st.caption(_badge(p2["provider"], p2["cached"]))
-                st.markdown(p2["text"])
-            else:
-                st.info("Nada gerado ainda.")
-            if st.button("Gerar roteiro", type="primary"):
-                try:
-                    with st.spinner("Gerando roteiro..."):
-                        p1 = st.session_state.get("pass1")
-                        if not p1:  # auto-encadeia o Pass1 em silêncio
-                            text1, _, _ = get_pass1(q, str(chapter) if chapter else "all",
-                                                    top5, macro, addendum, use_cache)
-                            p1 = st.session_state["pass1"] = {
-                                "text": text1, "provider": "encadeado",
-                                "cached": False, "chunk_sig": sig}
-                        text, prov, cached = get_pass2(
-                            q, str(chapter) if chapter else "all", persona,
-                            p1["text"], p1["chunk_sig"], use_cache)
-                    st.session_state["pass2"] = {"text": text, "provider": prov,
-                                                 "cached": cached}
-                    st.rerun()
-                except (RuntimeError, ValueError) as e:
-                    st.error(str(e))
 
-            st.divider()
-            p2 = st.session_state.get("pass2")
-            if p2:
-                import os as _os
-                _override = _os.getenv("OPENROUTER_TTS_VOICE", "")
-                pvoice = (_override if premium_voice and _override
-                          else (load_persona(persona).get("tts_voice_openrouter", voice)
-                                if premium_voice else voice))
-                st.caption(f"Roteiro pronto ({len(p2['text'])} chars · voz `{pvoice}`"
-                           + (" · premium" if premium_voice else "") + ")")
-                _roteiro_chars = len(clean_for_speech(p2["text"]))
-                if _roteiro_chars > config.TTS_MAX_CHARS:
-                    st.warning(f"Roteiro com {_roteiro_chars} chars limpos excede o limite de "
-                               f"TTS_MAX_CHARS={config.TTS_MAX_CHARS}. "
-                               f"Encurte o roteiro (ou aumente o limite no `.env`) antes de gerar áudio.")
-                if st.button("Gerar áudio (5-8min)"):
-                    try:
-                        with st.spinner(f"Sintetizando com {pvoice}..."):
-                            if premium_voice:
-                                try:
-                                    mp3, engine, n = synthesize_premium(
-                                        p2["text"], pvoice, use_cache=use_cache)
-                                    engine = f"{engine} ({n} fatia(s))"
-                                except RuntimeError as e:
-                                    st.warning(f"Premium indisponível ({str(e)[:120]}…) — "
-                                               f"caindo p/ Edge-TTS grátis.")
-                                    mp3, engine = synthesize(p2["text"], voice, use_cache)
-                            else:
-                                mp3, engine = synthesize(p2["text"], voice, use_cache)
-                        st.session_state["mp3"] = str(mp3)
-                        st.caption(f"via `{engine}`"
-                                   + (" · do cache" if engine == "cache" else ""))
-                        st.audio(str(mp3))
-                        st.download_button("Baixar MP3", data=mp3.read_bytes(),
-                                           file_name=mp3.name, mime="audio/mpeg")
-                    except RuntimeError as e:
-                        st.error(str(e))
-                elif st.session_state.get("mp3"):
-                    mp3 = Path(st.session_state["mp3"])
-                    if mp3.exists():
-                        st.audio(str(mp3))
-                        st.download_button("Baixar MP3", data=mp3.read_bytes(),
-                                           file_name=mp3.name, mime="audio/mpeg")
-            else:
-                st.button("Gerar áudio (5-8min)", disabled=True,
-                          help="Gere o roteiro primeiro")
+def _run(intent: str, box, force: bool = False) -> None:
+    """Executa a intenção e grava em session_state. Falha vira card com ação.
+
+    `force=True` (botão ↻ Regerar) ignora o cache **daquele** estágio e invalida
+    o que depende dele (novo resumo derruba roteiro+áudio; novo roteiro derruba
+    o áudio), para nunca servir conteúdo baseado em texto velho.
+    """
+    s = st.session_state
+    s.pop("ui_error", None)
+    s.pop("audio_notice", None)
+    p1 = s.get("pass1")
+    stage = "resumo"
+
+    def _drop(*keys: str) -> None:
+        for k in keys:
+            s.pop(k, None)
+
+    try:
+        if intent in ("listen", "pass1", "pass2"):
+            fresh_p1 = force and intent == "pass1"
+            if fresh_p1 or not p1:
+                if box:
+                    box.update(label=copy.STEP_RESUMO)
+                text, prov, cached = get_pass1(q, scope_str, top5, macro, addendum,
+                                               use_cache and not fresh_p1)
+                p1 = s["pass1"] = {"text": text, "provider": prov, "cached": cached,
+                                   "chained": intent in ("listen", "pass2"),
+                                   "chunk_sig": chunk_sig_of(top5), "persona": persona}
+                # resumo (re)gerado: roteiro e áudio antigos não valem mais
+                _drop("pass2", "mp3", "mp3_sig", "mp3_engine", "audio_notice")
+        stage = "roteiro"
+        fresh_p2 = force and intent == "pass2"
+        if intent in ("listen", "pass2") and (fresh_p2 or not s.get("pass2")):
+            if box:
+                box.update(label=copy.STEP_ROTEIRO)
+            text, prov, cached = get_pass2(q, scope_str, persona, p1["text"],
+                                           p1["chunk_sig"], use_cache and not fresh_p2)
+            s["pass2"] = {"text": text, "provider": prov, "cached": cached,
+                          "chars": len(clean_for_speech(text)), "voice": voice_out}
+            # roteiro novo: o áudio antigo deixa de corresponder
+            _drop("mp3", "mp3_sig", "mp3_engine", "audio_notice")
+        stage = "audio"
+        if intent in ("listen", "audio") and s.get("pass2"):
+            if premium_voice and not s.get("confirm_premium", False):
+                s["ui_error"] = {"stage": "audio", "msg": copy.PREMIUM_GATE,
+                                 "hint": copy.PREMIUM_GATE}
+                return
+            if box:
+                box.update(label=copy.STEP_AUDIO)
+            mp3, engine = _synth(s["pass2"]["text"], force)
+            s["mp3"] = str(mp3)
+            s["mp3_sig"] = _audio_sig(s["pass2"]["text"], voice_out)
+            s["mp3_engine"] = engine
+    except (RuntimeError, ValueError) as e:
+        s["ui_error"] = {"stage": stage, "msg": str(e)}
+
+
+def _queue(intent: str, force: bool = False) -> None:
+    """Callback: o clique vira intenção no próximo run, antes de renderizar os cards."""
+    st.session_state["queued_intent"] = {"intent": intent, "force": force}
+
+
+def _retry(stage: str) -> None:
+    st.session_state.pop("ui_error", None)
+    st.session_state["queued_intent"] = {"intent": copy.STAGE_RETRY.get(stage, "pass1"),
+                                         "force": False}
+
+
+def _retry_search() -> None:
+    st.session_state.pop("ret_ctx", None)
+
+
+# -- rail de ações → intenção (rail ou clique num card do run anterior) --------
+p2_now = st.session_state.get("pass2")
+intent = None
+if ph_rail is not None:
+    with ph_rail.container():
+        intent = actions.rail(has_sources=has_sources,
+                              script_chars=(p2_now or {}).get("chars"),
+                              premium=premium_voice,
+                              has_p1=bool(st.session_state.get("pass1")),
+                              has_p2=bool(p2_now))
+queued = st.session_state.pop("queued_intent", None)
+if isinstance(queued, str):  # compat: fila antiga era só a string do intent
+    queued = {"intent": queued, "force": False}
+force = False
+if queued:
+    intent = intent or queued.get("intent")
+    force = bool(queued.get("force")) and intent == queued.get("intent")
+
+if intent:
+    with ph_run.status(copy.RUN_LABEL.get(intent, copy.RUN_LABEL["listen"]),
+                       expanded=True) as box:
+        t0 = time.monotonic()
+        _run(intent, box, force)
+        elapsed = time.monotonic() - t0
+        failed = bool(st.session_state.get("ui_error"))
+        box.update(state="error" if failed else "complete",
+                   label=(copy.RUN_FAILED if failed
+                          else f"{copy.RUN_DONE} · {elapsed:.0f} s"),
+                   expanded=failed)
+
+# trilha de estágios (preenchida depois da execução: mesmo run, sem piscar)
+stages.rail(q, top5, st.session_state.get("pass1"), st.session_state.get("pass2"),
+            _valid_audio((st.session_state.get("pass2") or {}).get("text"), voice_out),
+            err=ret_err, target=ph_stages)
+
+# -- leitura: pergunta, fontes, resumo, roteiro, áudio ------------------------
+with ph_q.container(border=True, key="gdl_card_q"):
+    st.markdown(f"**{q}**")
+    st.caption(copy.context_line(len(top5), persona, strategy, use_rerank))
+    st.button(copy.NEW_QUESTION, key="new_question", on_click=_new_question)
+
+
+def _render_sources() -> None:
+    sources.render(ph_src, top5, cands, strategy, macro, chapter,
+                   err=ret_err, on_retry=_retry_search)
+
+_render_sources()
+
+
+def _error_card(stage: str) -> bool:
+    err = st.session_state.get("ui_error") or {}
+    if err.get("stage") != stage:
+        return False
+    st.error(err.get("hint") or copy.STAGE_ERROR[stage])
+    st.button(copy.RETRY, key=f"retry_{stage}", on_click=_retry, args=(stage,))
+    if not err.get("hint"):
+        with st.expander(copy.DETAILS):
+            st.write(err.get("msg", ""))
+    return True
+
+
+def _regen_button(key: str, intent: str) -> None:
+    """↻ Regerar: refaz só este estágio ignorando o cache (não toca no áudio)."""
+    st.caption(copy.REGERAR_HINT)
+    st.button(copy.REGERAR, key=key, on_click=_queue, args=(intent, True))
+
+
+# resumo técnico
+p1 = st.session_state.get("pass1")
+with ph_p1.container(border=True, key="gdl_card_p1"):
+    st.markdown(f"**{copy.PASS1_TITLE}**")
+    if not _error_card("resumo"):
+        if p1:
+            st.caption(copy.provenance(p1["provider"], p1["cached"],
+                                       p1.get("chained", False)))
+            render_mixed(st, p1["text"])
+            _regen_button("regen_p1", "pass1")
+        else:
+            st.caption(copy.P1_EMPTY)
+            st.button(copy.BTN_GEN_P1, width="stretch", key="gen_p1",
+                      disabled=not has_sources, on_click=_queue, args=("pass1",))
+
+# roteiro falado
+p2 = st.session_state.get("pass2")
+with ph_p2.container(border=True, key="gdl_card_p2"):
+    st.markdown(f"**{copy.PASS2_TITLE}**")
+    if not _error_card("roteiro"):
+        if p2:
+            st.caption(f"{copy.provenance(p2['provider'], p2['cached'])} · "
+                       f"≈{copy.audio_minutes(p2['chars']):g} min")
+            st.markdown(p2["text"])
+            if p2["chars"] > config.TTS_MAX_CHARS:
+                st.warning(f"Roteiro com {p2['chars']} chars limpos excede o limite de "
+                           f"TTS_MAX_CHARS={config.TTS_MAX_CHARS}. Encurte o roteiro "
+                           f"(ou aumente o limite no `.env`) antes de gerar áudio.")
+            _regen_button("regen_p2", "pass2")
+        else:
+            st.caption(copy.P2_EMPTY)
+            st.button(copy.BTN_GEN_P2, width="stretch", key="gen_p2",
+                      disabled=not has_sources, on_click=_queue, args=("pass2",))
+
+# áudio
+mp3 = _valid_audio((p2 or {}).get("text"), voice_out)
+audio_allowed = (not premium_voice) or bool(st.session_state.get("confirm_premium", False))
+with ph_audio.container(border=True, key="gdl_card_audio"):
+    st.markdown(f"**{copy.AUDIO_TITLE}**")
+    if not _error_card("audio"):
+        if st.session_state.get("audio_notice"):
+            st.info(st.session_state["audio_notice"])
+        if not p2:
+            st.caption(copy.AUDIO_EMPTY)
+        elif mp3:
+            st.caption(copy.AUDIO_IN_DOCK)
+            st.button(copy.BTN_AUDIO_REGEN, width="stretch", key="gen_audio",
+                      disabled=not audio_allowed,
+                      on_click=_queue, args=("audio", True))
+        elif st.session_state.get("mp3"):
+            st.info(copy.AUDIO_ORPHAN)
+            st.button(copy.BTN_AUDIO_REGEN, width="stretch", key="gen_audio",
+                      disabled=not audio_allowed,
+                      on_click=_queue, args=("audio",))
+        else:
+            st.caption(copy.audio_label(p2["chars"]))
+            st.button(copy.BTN_GEN_AUDIO, width="stretch", key="gen_audio",
+                      disabled=not audio_allowed,
+                      on_click=_queue, args=("audio",))
+        if p2 and not audio_allowed:
+            st.caption(copy.PREMIUM_GATE)
+
+# -- U5: player dock fixo (só com áudio válido do roteiro/voz atuais) ----------
+if mp3:
+    with st.container(key="gdl_dock"):
+        player.render(
+            mp3,
+            title=history.short_query(q, copy.DOCK_QUERY_CHARS),
+            meta=copy.dock_meta(p2["chars"], voice_out,
+                                st.session_state.get("mp3_engine", "")),
+            download_name=f"gdl-audio{mp3.suffix}",
+            sig=st.session_state.get("mp3_sig"),
+        )
+
+# -- sessão (U4): salva o turno atual e preenche o ☰ (já com o áudio de agora) --
+top5_now = st.session_state.get("top5") or []
+if query and top5_now:
+    p1_now = st.session_state.get("pass1")
+    p2_now = st.session_state.get("pass2")
+    mp3_now = _valid_audio((p2_now or {}).get("text"), voice_out)
+    turn = history.build_turn(
+        query=query, scope=scope, persona=persona, strategy=strategy,
+        rerank=bool(use_rerank) if strategy == "vetorial" else False,
+        chapter=chapter, ctx=ctx, top5=top5_now, pass1=p1_now, pass2=p2_now,
+        mp3=str(mp3_now) if mp3_now else None,
+        mp3_sig=st.session_state.get("mp3_sig") if mp3_now else None,
+        mp3_engine=st.session_state.get("mp3_engine") if mp3_now else None,
+        premium=premium_voice)
+    turns = history.upsert(st.session_state.get("turns") or [], turn)
+    st.session_state["turns"] = turns
+    saved = next((t for t in turns if tuple(t.get("key") or ()) == turn["key"]), turn)
+    st.session_state["turn_current"] = saved["id"]
+
+_render_session()
