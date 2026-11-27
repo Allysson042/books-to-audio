@@ -3,9 +3,12 @@
 > Memória quente desta pasta. Backlog do projeto: `../TASKS.md`; ajustes pequenos/bugs: `../BACKLOG.md`; design travado: `../ARCHITECTURE.md`.
 > Este arquivo NÃO duplica o backlog — só indexa as notas e aponta o que ainda está vivo nelas.
 
-## Contexto Atual (2026-11-11)
-As 5 notas `.md` têm contrapartida implementada no código e funcionam como *design rationale*.
-O que resta de vivo são as seções "Fora de escopo"/"Futuro" e alguns resíduos textuais abaixo.
+## Contexto Atual (2026-11-26)
+As 5 notas de design têm contrapartida implementada no código e funcionam como *design rationale*.
+`LIMITS.md` é a nota viva: P0 e a trilha vectorless **V0→V3 concluídas**. O vectorless usa store
+próprio por seção (271 chunks): **in_scope 99-100%** (era 56%), tree@5 e tree@all 10/10, sem tocar
+em Chroma/BM25/árvore. A régua, porém, tem 5 perguntas fáceis — o ganho real do V3 (seleção em
+pergunta ambígua) ainda não está medido.
 
 ## Status por nota
 | Nota | Data | Status | Evidência verificada | Absorvida em |
@@ -16,14 +19,24 @@ O que resta de vivo são as seções "Fora de escopo"/"Futuro" e alguns resíduo
 | `tts-openrouter-plan.md` | 2026-10-06 | implementado | `src/tts_provider.py` `synthesize_premium`, `split_slices`, `TTS_MAX_CHARS=15000`; `OPENROUTER_TTS_MODEL` no `.env.example` | `../ARCHITECTURE.md` Ramo 4 |
 | `tree-hierarchy-plan.md` | 2026-10-09 | implementado | `src/tree_index.py` `build_tree()` com `children`; `cache/tree_livro.json` version 2 | `../ARCHITECTURE.md` Ramo 2 (`../TASKS.md` só conclusão) |
 | `count_tokens.py` | — | parcial/frágil | `ingest.load_chapters`/`clean_page_text` existem, mas `tiktoken` não está em `requirements.txt` | só anotação |
+| `LIMITS.md` | 2026-11-26 | P0 + V0→V3 implementados; P1a aberto | auditoria + medições; P0 sem regressão (5/10 re-rank ON, 7/10 híbrido); V0/V1 (ranked 10/10 @5, 63%); V2 (271 chunks por seção, 99%); V2.1 (`tree_fit` com desconto 0.5, 36/36 resgatados); V3 (`TREE_PROMPT=v1|v2`, v2 = 100%/10/10, prompt 16.819→28.298); vetorial 3/5 inalterado | `../TASKS.md` §P0, §V0/V1, §V2, §V2.1+V3 |
 
 ## Decisões já absorvidas (não rediscutir)
 - Re-rank default **OFF** (cross-encoder rebaixava chunks didáticos).
 - Vectorless é o default da UI; vetorial disponível por toggle.
 - TTS premium default **MAI-Voice** (Gemini TTS inventa trechos).
 - Cache: toggle OFF pula leitura, mantém escrita; bust por versão (`PROMPT_VERSION`/`TTS_VERSION`/`TREE_VERSION`).
+- **Vectorless tem store de chunks próprio** (`storage/tree_chunks.jsonl`, alinhado à seção); Chroma/`bm25.jsonl` continuam exclusivos do ramo vetorial. `TREE_CHUNKS_PATH` com fallback.
 
 ## Pendências reais (das seções "Fora de escopo")
+- [x] **P0** destravar limites (`LIMITS.md` §10): feito e validado (2026-11-13) — `src/config.py`, `src/token_budget.py`, Gemini com `generation_config`/`system_instruction`, retry/backoff, chaves de cache v6, `split_slices`. Régua sem regressão (5/10 re-rank ON, 7/10 híbrido).
+- [ ] **P1a** vector-only (não toca no vectorless): embedding de janela maior (hoje `all-MiniLM-L6-v2` trunca em 256 tok ≈ ⅓ do chunk) + re-rank maior.
+- [ ] **P2** BM25 com stemming PT, embeddings normalizados (cosine), orçamento de custo por chamada.
+- [x] **Vectorless V0/V1** (medido em `LIMITS.md` §11): régua `--strategy tree` agnóstica a chunking + entrega `TREE_DELIVERY=ranked` (ranking por `in_scope`/`tree_lex` + quota por nó + ordem por score). **10/10 @5 e @all, in_scope 63%**; legacy mantido para A/B.
+- [x] **Vectorless V2** (2026-11-26): `scripts/build_tree_chunks.py` → `storage/tree_chunks.jsonl` (271 chunks por seção, 13 grupos fundidos, cobertura 100%); `TreeStore` lê `TREE_CHUNKS_PATH` com fallback para `bm25.jsonl`; Chroma/BM25/árvore intactos. **in_scope 99%** (era 63%), 10/10 @5 e @all, chars/query 10.240.
+- [x] **Vectorless V2.1** (2026-11-26): `tree_fit` (sinal de ranking) separado de `in_scope` (métrica); fallback `0.5 × span do nó` resgata 36/36 chunks de abertura. Sem desconto o fallback virava 1.0 e piorava a ordem.
+- [x] **Vectorless V3** (2026-11-26): `TREE_PROMPT=v1|v2`; v2 com página impressa consistente + snippet de 80 chars nas folhas (160/202, orçamento 12k). v1 reusa `tree_sel_*` antigo (A/B sem LLM). v2: 100%/10/10, prompt +68% (16.819→28.298).
+- [ ] **Medir a seleção de verdade**: a régua (5 perguntas, 9 fáceis) não distingue v1 de v2. Faltam perguntas ambíguas/panorâmicas (ex. "resuma o capítulo", "como se relacionam X e Y") para justificar o custo do prompt maior.
 - [ ] S5: `scripts/demo_seed.py` (3 Q&A + 2 MP3) — **não existe**.
 - [ ] S5: modo offline real (rastreado como **B1** em `../BACKLOG.md`).
 - [ ] Comparação formal vetorial × vectorless nas 5 douradas.
@@ -34,8 +47,15 @@ O que resta de vivo são as seções "Fora de escopo"/"Futuro" e alguns resíduo
 
 ## Resíduos e pendências de doc
 - Resolvidos em 2026-11-11: contagem 242→256 em `ARCHITECTURE.md`/`TASKS.md`; aviso de implementado em `golden-questions.md`; typo e "após S5" em `vectorless-pageindex.md`; checkboxes de aceite marcados em `ui-refactor.md`/`tts-openrouter-plan.md`; pasta renomeada `anotations/`→`docs/` e versionada (`.gitignore` limpo).
-- `count_tokens.py` depende de `tiktoken` ausente do `requirements.txt` (documentado no docstring).
+- `count_tokens.py` depende de `tiktoken`, agora no `requirements.txt` (P0, 2026-11-13); o script segue avulso.
+- Aprendizado 2026-11-13: **`python-dotenv` não descarta comentário inline** (`KEY=valor  # nota` vira valor com `#`). No `.env`/`.env.example`, comentário sempre em linha própria — quebrou `LLM_TEMPERATURE` e derrubaria os knobs novos.
+- 2026-11-26 (V2): a árvore tem **lacunas de cobertura** (21 páginas de capítulo sem folha), origem dos 36 chunks com `in_scope=0`; `storage/tree_chunks.jsonl` é gerado (não versionado, como Chroma) por `scripts/build_tree_chunks.py`.
 
 ## Próximo Passo Imediato
-Atacar S5 (`scripts/demo_seed.py` + 2 MP3 pré-gerados + modo offline); depois a comparação formal vetorial × vectorless nas 5 douradas.
+**Medir a seleção de verdade** antes de manter `TREE_PROMPT=v2` como default: a régua atual (5
+perguntas, 9 fáceis) empata v1 e v2, mas v2 custa +68% de prompt e quota LLM por query nova.
+Adicionar 3-5 perguntas **ambíguas/panorâmicas** em `scripts/golden.json` (ex. "resuma o capítulo 4",
+"como se relacionam GANs e diffusion?") e comparar v1 × v2. Se v2 não ganhar, voltar o default para
+v1 (grátis via cache). Independentes: **P1a** (embedding de janela maior, só vetorial) e **S5**
+(`demo_seed.py` + modo offline).
 Miudezas descobertas em sessão (fora de sprint) vão para `../BACKLOG.md`, não para cá.

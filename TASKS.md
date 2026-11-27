@@ -52,6 +52,29 @@
 - [x] `scripts/fix_summaries.py`: reparo dos `summary_2lines` sem quota + rebuild da árvore.
 - [x] Fidelidade de contexto: Pass1 recebe chunks ~inteiros (`CHUNK_CHARS=4500`; regra UI mostra = LLM recebe); MAI-Voice é o default premium (Gemini TTS inventa trechos — ver log 05/10).
 
+## P0 — Destravar limites (2026-11-13) [x] — ver `docs/LIMITS.md` §10
+- [x] `GeminiProvider`: respeitar `max_tokens` via `generation_config`, `temperature` configurável e `system_instruction` nativo
+- [x] Knobs por env (`src/config.py`, defaults idênticos): `CHUNK_CHARS`, `MAX_TOKENS`, `RETRIEVAL_PREFETCH`, `RETRIEVAL_TOP_N`, `MAX_NODES`, `MAX_CHUNKS`, `TTS_MAX_CHARS`, `TTS_SLICE_CHARS`, `LLM_TIMEOUT`, `LLM_RETRIES`, `LLM_TEMPERATURE`, `CONTEXT_TOKENS_BUDGET`, `MAX_QUERY_CHARS`
+- [x] `tiktoken` + orçamento total de contexto com clipping por prioridade (micro > macro > mapa) e log `[context]` (`src/token_budget.py`)
+- [x] Retry/backoff nos providers LLM (429/5xx/timeout/conexão; 401/403 e content vazio caem direto no fallback)
+- [x] Chaves de cache: persona+macro no Pass1, `pass1_text` no Pass2; `PROMPT_VERSION` → `v6`
+- [x] `split_slices`: cortar parágrafo maior que o limite (senão `TTS_MAX_CHARS` é furado)
+- [x] UI: aviso quando roteiro excede `TTS_MAX_CHARS`; `max_chars` no input
+
+## Vectorless V0/V1 (2026-11-13) [x] — ver `docs/LIMITS.md` §11
+- [x] **V0** `scripts/eval_retrieval.py --strategy {vector,tree,both}`: acerto do vectorless agnóstico a chunking (chapter + sobreposição de páginas vs `expected_ids`; Q4 por `expected_chapters`), `tree@5`/`tree@all`, `in_scope` médio e chars. Baseline legacy: 8/10 tree@5, 8/10 tree@all, in_scope 56%.
+- [x] **V1** `TREE_DELIVERY=ranked|legacy` (`src/config.py`) + `rank_and_allocate()` em `src/retrieval_tree.py`: ranking por `in_scope`/`tree_lex` e quota por nó (fim do 1º nó consumir as 10 vagas); a quota define **pertinência** e a saída é reordenada por score (define **prioridade**/`tree@5`). Ranked: **10/10 tree@5 e 10/10 tree@all, in_scope 63%** (Q4 acerta em `5@2` EN / `5@3` PT). `legacy` = comportamento antigo byte-a-byte (8/10 e 8/10); vetorial intacto (3/5 en com re-rank).
+
+## Vectorless V2 (2026-11-26) [x]
+- [x] `scripts/build_tree_chunks.py` (sem LLM): páginas consecutivas agrupadas pela seção do TOC (merge de grupos <50 palavras; rabo absorvido), janela 600/90 rodando **dentro do grupo**, `doc_id` `t{cap}_p{ini}-{fim}_{idx}`. Gera `storage/tree_chunks.jsonl`: **271 chunks** (14 caps), cobertura de palavras 100%, invariantes OK (chunk dentro do grupo/seção, sem duplicata).
+- [x] `TreeStore` lê `TREE_CHUNKS_PATH` (default `storage/tree_chunks.jsonl`; relativo à raiz) com **fallback** para `storage/bm25.jsonl` (ausente/vazio/corrompido = aviso, nunca exceção); expõe `chunks_source`/`chunks_count` e loga `[tree] chunks: <path> (N)`. Chroma, `bm25.pkl`/`jsonl`, `tree_livro.json` e o prompt da árvore **intactos**.
+- [x] Régua: cabeçalho do `--strategy tree` mostra store/count. **in_scope médio 99%** (era 63%), tree@5 **10/10**, tree@all 10/10, chars médios 10.240 (era 15.560). A/B (`TREE_CHUNKS_PATH=storage/__none__.jsonl`) reproduz 63% / 10/10. Por chunk: mediana **100%**, 86% ≥90% (os 37 restantes são páginas de abertura de capítulo/seção fora dos ranges das folhas → bleed residual).
+- [x] Vetorial inalterado (en 3/5); AppTest sem exceção.
+
+## Vectorless V2.1 + V3 (2026-11-26) [x] — ver `docs/LIMITS.md` §11
+- [x] **V2.1** `tree_fit` (sinal de ranking) separado de `in_scope` (métrica) + `FALLBACK_FIT_DISCOUNT=0.5`: resgata 36/36 chunks de abertura de capítulo/seção que tinham `in_scope=0`. Sem o desconto o fallback virava 1.0 (span de capítulo cobre 100%) e piorava a ordem (soma de posições 6 vs 4; in_scope 92% vs 99%). Com 0.5: **in_scope 99%, tree@5 10/10, tree@all 10/10**, Q2-pt e Q4 em `5@2`.
+- [x] **V3** `TREE_PROMPT=v1|v2` (`src/config.py`): v2 padroniza **página impressa** em todos os níveis (antes capítulo=`book_page`, L3/L4=`pdf_page`) + snippet de 80 chars nas folhas (`SNIPPET_BUDGET=12000`; 160/202 nós, 12.012 chars). v1 preserva o prompt antigo **e a chave de cache antiga** (`tree|v{VERSION}|{scope}|{query}`) — A/B de graça, sem LLM; v2 usa `p2|` na chave. Medição: v1 = 99% / 10/10 / 10/10 / 10.240 chars / prompt 16.819; v2 = **100% / 10/10 / 10/10 / 9.575 chars** / prompt **28.298 (+68%)**. Ganho marginal na régua de 5 perguntas (9 fáceis); alvo real (pergunta ambígua) não medido. Risco: 42 folhas sem snippet criam assimetria de sinal.
+
 ## Futuro (pós-seminário)
 - [ ] VLM para descrever figuras
 - [ ] Avaliação RAGAS, editor de persona, Qdrant

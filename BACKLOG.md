@@ -15,6 +15,7 @@
 | ID | Data | Sintoma | Onde | Impacto | Pri |
 |---|---|---|---|---|---|
 | B1 | 2026-11-11 | Toggle "Modo offline" é cosmético: só aparece num caption, não altera nenhum caminho de leitura de cache | `app.py:45` (toggle) + `app.py:136` (caption) | Parece ter fallback offline na demo e não tem | P2 |
+| B5 | 2026-11-26 | Scripts travam ~12 min **sem consumir CPU** esperando o HF Hub (`sentence-transformers` checa atualização do modelo); parece "retrieval lento" mas é rede (medido: 6s de CPU em 11m52s, estado S) | `scripts/eval_retrieval.py` e qualquer entrypoint que instancie `RAGStore` | Demo/CI podem pendurar; rodar com `HF_HUB_OFFLINE=1 TRANSFORMERS_OFFLINE=1` resolve e casa com o B1 (modo offline real) | P2 |
 
 ## Resolvidos
 | ID | Fechado | Sintoma | Fix (commit) |
