@@ -9,11 +9,12 @@ logging.getLogger("streamlit.watcher.local_sources_watcher").setLevel(logging.CR
 
 import streamlit as st
 
+from src import config
 from src.generate import chunk_sig_of, get_pass1, get_pass2, load_persona
 from src.markdown_math import render_mixed
 from src.retrieval import RAGStore, Reranker
 from src.retrieval_tree import TreeStore
-from src.tts_provider import synthesize, synthesize_premium
+from src.tts_provider import clean_for_speech, synthesize, synthesize_premium
 
 st.set_page_config(page_title="Books to Audio — GDL", layout="wide")
 st.title("Books to Audio — Generative Deep Learning")
@@ -80,7 +81,7 @@ def _treestore() -> TreeStore:
 # dentro de tabs/columns/expander ele quebra o layout (fixa no rodapé do container).
 submitted = st.chat_input(
     placeholder="Pergunte ou peça resumo de capítulo — ex: O que é ELBO em VAEs?",
-    key="q_input")
+    max_chars=config.MAX_QUERY_CHARS, key="q_input")
 if submitted and submitted.strip():
     st.session_state["query"] = submitted.strip()
 
@@ -114,8 +115,9 @@ if query:
                     top5, cands = [], []
         else:
             with st.spinner("Recuperando chunks (Chroma + BM25 → RRF → re-rank)..."):
-                cands = _store().search(q, chapter=chapter, top_n=20)
-                top5 = _reranker().rerank(q, cands, top_n=5) if (cands and use_rerank) else cands[:5]
+                cands = _store().search(q, chapter=chapter, top_n=config.RETRIEVAL_PREFETCH)
+                top5 = (_reranker().rerank(q, cands, top_n=config.RETRIEVAL_TOP_N)
+                        if (cands and use_rerank) else cands[:config.RETRIEVAL_TOP_N])
         st.session_state["ret_ctx"] = ctx
         st.session_state["top5"] = top5
         st.session_state["cands"] = cands
@@ -217,6 +219,11 @@ if query:
                                 if premium_voice else voice))
                 st.caption(f"Roteiro pronto ({len(p2['text'])} chars · voz `{pvoice}`"
                            + (" · premium" if premium_voice else "") + ")")
+                _roteiro_chars = len(clean_for_speech(p2["text"]))
+                if _roteiro_chars > config.TTS_MAX_CHARS:
+                    st.warning(f"Roteiro com {_roteiro_chars} chars limpos excede o limite de "
+                               f"TTS_MAX_CHARS={config.TTS_MAX_CHARS}. "
+                               f"Encurte o roteiro (ou aumente o limite no `.env`) antes de gerar áudio.")
                 if st.button("Gerar áudio (5-8min)"):
                     try:
                         with st.spinner(f"Sintetizando com {pvoice}..."):

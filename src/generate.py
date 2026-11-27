@@ -12,16 +12,17 @@ from pathlib import Path
 
 import yaml
 
+from src.config import (CHUNK_CHARS, CONTEXT_TOKENS_BUDGET, MAX_TOKENS,
+                        RETRIEVAL_PREFETCH, RETRIEVAL_TOP_N)
 from src.llm_provider import complete_with_fallback
 from src.prompts import GLOSSARIO, PASS1, PASS2_INICIANTE, PASS2_TECNICO
 from src.retrieval import RAGStore, Reranker
+from src.token_budget import fit_chunks_to_budget
 
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "cache"
 PERSONAS = ROOT / "personas"
-PROMPT_VERSION = "v5"  # bump p/ invalidar todo o cache textual
-CHUNK_CHARS = 4500    # cobre ~todos os chunks inteiros (max 4864); corte em fronteira de palavra
-MAX_TOKENS = 2500     # teto de saída Pass1/Pass2 (1500 cortava respostas longas)
+PROMPT_VERSION = "v6"  # bump p/ invalidar todo o cache textual (P0: chaves + orçamento)
 
 
 def load_persona(name: str) -> dict:
@@ -42,15 +43,24 @@ def _clip(text: str, limit: int = CHUNK_CHARS) -> str:
     return text[:limit].rsplit(" ", 1)[0] + " […]"
 
 
-def pass1_user(query: str, chunks: list[dict], macro: str | None) -> str:
-    parts = [f"Pergunta: {query}"]
+def pass1_user(query: str, chunks: list[dict], macro: str | None,
+               system_text: str = "") -> str:
+    prior = [f"Pergunta: {query}"]
     if macro:
-        parts.append(f"Resumo macro do capítulo em foco (contexto, PT-BR):\n{macro[:3000]}")
-    parts.append("Chunks recuperados (fontes — cite como [Cap X, p. Y]):")
-    for c in chunks:
+        prior.append(f"Resumo macro do capítulo em foco (contexto, PT-BR):\n{macro[:3000]}")
+    header = "Chunks recuperados (fontes — cite como [Cap X, p. Y]):"
+    tail = "Responda em PT-BR. Se os chunks não contiverem a resposta, diga que não encontrou."
+    # Orçamento total: o texto fixo (system + pergunta + macro + instruções) é descontado
+    # e os chunks excedentes saem do FIM (micro > macro). budget=0 desliga o clipping.
+    fixed_text = "\n\n".join([system_text, *prior, header, tail])
+    kept = fit_chunks_to_budget([_clip(c["text"]) for c in chunks], fixed_text,
+                                CONTEXT_TOKENS_BUDGET)
+    parts = list(prior)
+    parts.append(header)
+    for c, text in zip(chunks, kept):
         m = c["metadata"]
-        parts.append(f"- {c['citation']} {m['section']} [{m['type']}]: {_clip(c['text'])}")
-    parts.append("Responda em PT-BR. Se os chunks não contiverem a resposta, diga que não encontrou.")
+        parts.append(f"- {c['citation']} {m['section']} [{m['type']}]: {text}")
+    parts.append(tail)
     return "\n\n".join(parts)
 
 
@@ -67,22 +77,33 @@ def chunk_sig_of(chunks: list[dict]) -> str:
     return ",".join(sorted(c["doc_id"] for c in chunks))
 
 
+def _sig8(text: str | None) -> str:
+    """Assinatura curta de um texto (macro/Pass1) p/ entrar na chave de cache."""
+    return hashlib.sha256((text or "").encode()).hexdigest()[:8]
+
+
 def get_pass1(query: str, scope: str, chunks: list[dict], macro: str | None,
               addendum: str, use_cache: bool = True) -> tuple[str, str, bool]:
-    """Retorna (texto, provider, cached). Com use_cache=False, sempre chama o LLM (mas escreve o cache)."""
-    h1 = _key(PROMPT_VERSION, "pass1", scope, query, chunk_sig_of(chunks))
+    """Retorna (texto, provider, cached). Com use_cache=False, sempre chama o LLM (mas escreve o cache).
+
+    Chave inclui persona (`addendum`) e o macro: trocar persona/macro não reusa Pass1 velho.
+    """
+    h1 = _key(PROMPT_VERSION, "pass1", scope, query, chunk_sig_of(chunks),
+              addendum, _sig8(macro))
     p1_path = CACHE / f"pass1_{h1}.md"
     if use_cache and p1_path.exists():
         return p1_path.read_text(encoding="utf-8"), "cache", True
+    system1 = pass1_system(addendum)
     text, provider = complete_with_fallback(
-        pass1_system(addendum), pass1_user(query, chunks, macro), MAX_TOKENS)
+        system1, pass1_user(query, chunks, macro, system1), MAX_TOKENS)
     p1_path.write_text(text, encoding="utf-8")
     return text, provider, False
 
 
 def get_pass2(query: str, scope: str, persona: str, pass1_text: str,
               chunk_sig: str, use_cache: bool = True) -> tuple[str, str, bool]:
-    h2 = _key(PROMPT_VERSION, "pass2", persona, scope, query, chunk_sig)
+    """Chave inclui a assinatura do `pass1_text`: roteiro nunca vem de um resumo antigo."""
+    h2 = _key(PROMPT_VERSION, "pass2", persona, scope, query, chunk_sig, _sig8(pass1_text))
     p2_path = CACHE / f"pass2_{persona}_{h2}.md"
     if use_cache and p2_path.exists():
         return p2_path.read_text(encoding="utf-8"), "cache", True
@@ -98,7 +119,8 @@ def answer(query: str, chapter: int | None, persona: str = "tecnico_direto",
     """Pipeline S3: retrieve top-5 -> Pass1 (cache) -> Pass2 (cache)."""
     store = store or RAGStore()
     reranker = reranker or Reranker()
-    chunks = reranker.rerank(query, store.search(query, chapter, top_n=20), top_n=5)
+    chunks = reranker.rerank(query, store.search(query, chapter, top_n=RETRIEVAL_PREFETCH),
+                             top_n=RETRIEVAL_TOP_N)
     if not chunks:
         raise ValueError("Nada recuperado neste escopo — tente 'Livro todo'.")
 

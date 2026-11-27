@@ -13,3 +13,4 @@ pyyaml>=6.0
 edge-tts>=6.1
 imageio-ffmpeg>=0.5  # ffmpeg estático p/ concatenar fatias do TTS premium (sem apt)
 python-dotenv>=1.0
+tiktoken>=0.7  # contagem real de tokens p/ orçamento de contexto (P0)

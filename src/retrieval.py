@@ -20,6 +20,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from src.config import RETRIEVAL_PREFETCH, RETRIEVAL_TOP_N
+
 ROOT = Path(__file__).resolve().parent.parent
 CHROMA_DIR = ROOT / "storage" / "chroma"
 BM25_PATH = ROOT / "storage" / "bm25.pkl"
@@ -56,13 +58,15 @@ class RAGStore:
         self._pos = {doc_id: i for i, doc_id in enumerate(self.doc_ids)}
 
     # -- etapa 1: busca densa -------------------------------------------------
-    def dense_search(self, query: str, chapter: int | None = None, k: int = 20) -> list[str]:
+    def dense_search(self, query: str, chapter: int | None = None,
+                     k: int = RETRIEVAL_PREFETCH) -> list[str]:
         where = {"chapter": chapter} if chapter is not None else None
         res = self.col.query(query_texts=[query], n_results=k, where=where, include=["documents"])
         return res["ids"][0]
 
     # -- etapa 2: busca esparsa -----------------------------------------------
-    def sparse_search(self, query: str, chapter: int | None = None, k: int = 20) -> list[str]:
+    def sparse_search(self, query: str, chapter: int | None = None,
+                      k: int = RETRIEVAL_PREFETCH) -> list[str]:
         import numpy as np
 
         scores = np.asarray(self.bm25.get_scores(query.lower().split()), dtype=float)
@@ -81,7 +85,8 @@ class RAGStore:
                 fused[doc_id] = fused.get(doc_id, 0.0) + 1.0 / (k + rank)
         return sorted(fused.items(), key=lambda kv: kv[1], reverse=True)
 
-    def search(self, query: str, chapter: int | None = None, top_n: int = 20) -> list[dict]:
+    def search(self, query: str, chapter: int | None = None,
+               top_n: int = RETRIEVAL_PREFETCH) -> list[dict]:
         """Top-N candidatos com texto + metadata + scores de cada estágio."""
         dense = self.dense_search(query, chapter, k=top_n)
         sparse = self.sparse_search(query, chapter, k=top_n)
@@ -114,7 +119,8 @@ class Reranker:
             self._ce = CrossEncoder(self.model_name, device="cpu")
         return self._ce
 
-    def rerank(self, query: str, candidates: list[dict], top_n: int = 5) -> list[dict]:
+    def rerank(self, query: str, candidates: list[dict],
+               top_n: int = RETRIEVAL_TOP_N) -> list[dict]:
         ce = self._load()
         scores = ce.predict([(query, c["text"]) for c in candidates])
         ranked = sorted(zip(candidates, scores), key=lambda cs: cs[1], reverse=True)[:top_n]
@@ -127,7 +133,7 @@ class Reranker:
 
 
 def retrieve(query: str, chapter: int | None = None,
-             prefetch: int = 20, top_n: int = 5,
+             prefetch: int = RETRIEVAL_PREFETCH, top_n: int = RETRIEVAL_TOP_N,
              store: RAGStore | None = None,
              reranker: Reranker | None = None) -> list[dict]:
     """Pipeline S2 completo: híbrida + RRF + re-rank."""

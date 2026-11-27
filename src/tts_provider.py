@@ -25,6 +25,8 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
+from src import config
+
 ROOT = Path(__file__).resolve().parent.parent
 CACHE = ROOT / "cache" / "audio"
 CACHE.mkdir(parents=True, exist_ok=True)
@@ -37,8 +39,8 @@ TTS_VERSION = "v1"  # bump p/ invalidar todo o cache de áudio
 
 OPENROUTER_TTS_URL = "https://openrouter.ai/api/v1/audio/speech"
 OPENROUTER_TTS_MODEL = os.getenv("OPENROUTER_TTS_MODEL", "microsoft/mai-voice-2.1")
-TTS_SLICE_CHARS = 2500   # alvo por fatia (seguro p/ limites de ~3000 chars/request)
-TTS_MAX_CHARS = 15000    # trava de custo: acima disso, erro em vez de torrar crédito
+TTS_SLICE_CHARS = config.TTS_SLICE_CHARS  # alvo por fatia (seguro p/ ~3000 chars/request)
+TTS_MAX_CHARS = config.TTS_MAX_CHARS      # trava de custo: acima disso, erro em vez de torrar crédito
 
 
 def _key(text: str, voice: str) -> str:
@@ -49,13 +51,37 @@ def _ckey(engine: str, model: str, voice: str, text: str) -> str:
     return hashlib.sha256(f"{TTS_VERSION}|{engine}|{model}|{voice}|{text}".encode()).hexdigest()[:16]
 
 
+def _hard_split(text: str, limit: int) -> list[str]:
+    """Quebra `text` em pedaços <= limit: fronteira de palavra; sem espaço, corte duro."""
+    parts: list[str] = []
+    rest = text.strip()
+    while len(rest) > limit:
+        cut = rest.rfind(" ", 0, limit + 1)
+        if cut <= 0:  # palavra gigante (sem espaço): corte duro no limite
+            cut = limit
+        parts.append(rest[:cut].strip())
+        rest = rest[cut:].strip()
+    if rest:
+        parts.append(rest)
+    return parts
+
+
 def split_slices(text: str, limit: int = TTS_SLICE_CHARS) -> list[str]:
-    """Quebra por parágrafo/frase até ~limit chars (nunca corta no meio da frase)."""
+    """Quebra por parágrafo/frase até ~limit chars (nunca corta no meio da frase).
+
+    Parágrafo/frase maior que `limit` é subdividido (`_hard_split`): sem isso uma fatia
+    estouraria o request e furaria a trava `TTS_MAX_CHARS`.
+    """
     slices, cur = [], ""
     paras = [p.strip() for p in re.split(r"\n\s*\n", text.strip()) if p.strip()]
     if len(paras) <= 1:  # sem parágrafos: quebra por frase
-        paras = re.split(r"(?<=[.!?])\s+", text.strip())
+        paras = [p.strip() for p in re.split(r"(?<=[.!?])\s+", text.strip()) if p.strip()]
+    pieces: list[str] = []
     for p in paras:
+        pieces.extend(_hard_split(p, limit) if len(p) > limit else [p])
+    for p in pieces:
+        if not p:
+            continue
         if len(cur) + len(p) + 1 <= limit or not cur:
             cur = (cur + " " + p).strip()
         else:
