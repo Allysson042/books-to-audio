@@ -212,3 +212,6 @@ Textos canônicos vivem em `src/ui/copy.py` (a partir do U0) — não inline no 
 - **2026-11-27 (dock fixo)** — o dock passou de `position: sticky` (ficava no fim do conteúdo)
   para **`position: fixed; bottom: 5.5rem`**, sempre acima da barra de pergunta; conteúdo
   centralizado em `max(1rem, (100vw - 1120px)/2)`; conteúdo com `padding-bottom: 10rem`.
+- **2026-11-27 (mapa mental)** — card do mapa ganhou **"⛶ Ver em tela cheia"**: HTML/SVG
+  publicado em `static/mind/` (nova aba, `min-width:1200px`, tema) + **Baixar SVG**; sem
+  static serving, aviso + download. Pipeline do SVG não muda.

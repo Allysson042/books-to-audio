@@ -33,6 +33,7 @@ Não há suíte pytest; validação é manual/AppTest (ver `../TASKS.md`).
 | `tree-hierarchy-plan.md` | Árvore L2→L3→L4 com ranges por irmão | implementado |
 | `count_tokens.py` | Script avulso de contagem de tokens | parcial/frágil |
 | `UX/` | Plano de UX/UI (auditoria, wireframes, design system, roadmap U0–U5, spec, guia visual canônico, resultado antes/depois, mock navegável) | **U0–U5 + ajustes (cards/player) implementados**; validação humana pendente |
+| `image-mindmap-plan.md` | Mapa mental por imagem (catálogo/custos OpenRouter; outline JSON → SVG → imagem) | **M0 (SVG) implementado**; M1 (imagem) pendente |
 
 ## Regras para agentes
 - Notas são **histórico imutável**: decisão nova = nota nova + atualizar `STATE.md` e `../ARCHITECTURE.md`.
