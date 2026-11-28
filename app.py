@@ -12,13 +12,14 @@ logging.getLogger("streamlit.watcher.local_sources_watcher").setLevel(logging.CR
 
 import streamlit as st
 
-from src import config
+from src import config, image_provider
 from src.generate import chunk_sig_of, get_pass1, get_pass2, load_persona
 from src.markdown_math import render_mixed
+from src.mindmap import build_outline, outline_to_prompt, outline_to_svg
 from src.retrieval import RAGStore, Reranker
 from src.retrieval_tree import TreeStore
 from src.tts_provider import clean_for_speech, synthesize, synthesize_premium
-from src.ui import actions, copy, history, player, sources, stages, theme
+from src.ui import actions, copy, history, mindmap_view, player, sources, stages, theme
 
 st.set_page_config(page_title=copy.PAGE_TITLE, page_icon=copy.PAGE_ICON, layout="wide")
 theme.inject(st)
@@ -165,8 +166,8 @@ query = st.session_state.get("query", "")
 # (re-rank só entra no ctx no vetorial: alterná-lo no vectorless não rebusca)
 ctx = (query, scope, persona, use_rerank if strategy == "vetorial" else None, strategy)
 if st.session_state.get("ctx") != ctx:
-    for k in ("pass1", "pass2", "mp3", "mp3_sig", "mp3_engine", "ui_error", "audio_notice",
-              "top5", "cands", "ret_err"):
+    for k in ("pass1", "pass2", "mind", "mind_img", "mp3", "mp3_sig", "mp3_engine",
+              "ui_error", "audio_notice", "top5", "cands", "ret_err"):
         st.session_state.pop(k, None)
     st.session_state["ctx"] = ctx
 
@@ -264,6 +265,7 @@ with left:
         ph_q = st.empty()
         ph_src = st.empty()
         ph_p1 = st.empty()
+        ph_map = st.empty()
         ph_p2 = st.empty()
         ph_audio = st.empty()
 
@@ -343,7 +345,7 @@ def _run(intent: str, box, force: bool = False) -> None:
             s.pop(k, None)
 
     try:
-        if intent in ("listen", "pass1", "pass2"):
+        if intent in ("listen", "pass1", "pass2", "map"):
             fresh_p1 = force and intent == "pass1"
             if fresh_p1 or not p1:
                 if box:
@@ -351,10 +353,11 @@ def _run(intent: str, box, force: bool = False) -> None:
                 text, prov, cached = get_pass1(q, scope_str, top5, macro, addendum,
                                                use_cache and not fresh_p1)
                 p1 = s["pass1"] = {"text": text, "provider": prov, "cached": cached,
-                                   "chained": intent in ("listen", "pass2"),
+                                   "chained": intent in ("listen", "pass2", "map"),
                                    "chunk_sig": chunk_sig_of(top5), "persona": persona}
-                # resumo (re)gerado: roteiro e áudio antigos não valem mais
-                _drop("pass2", "mp3", "mp3_sig", "mp3_engine", "audio_notice")
+                # resumo (re)gerado: roteiro, áudio, mapa e imagem antigos não valem mais
+                _drop("pass2", "mind", "mind_img", "mp3", "mp3_sig", "mp3_engine",
+                      "audio_notice")
         stage = "roteiro"
         fresh_p2 = force and intent == "pass2"
         if intent in ("listen", "pass2") and (fresh_p2 or not s.get("pass2")):
@@ -378,6 +381,28 @@ def _run(intent: str, box, force: bool = False) -> None:
             s["mp3"] = str(mp3)
             s["mp3_sig"] = _audio_sig(s["pass2"]["text"], voice_out)
             s["mp3_engine"] = engine
+        stage = "mapa"
+        if intent == "map" and p1:
+            if box:
+                box.update(label=copy.STEP_MAPA)
+            outline, prov, cached = build_outline(
+                p1["text"], q, scope_str, use_cache and not force)
+            s["mind"] = {"svg": outline_to_svg(outline),
+                         "provider": prov, "cached": cached, "outline": outline}
+            # mapa novo: a imagem ilustrada do mapa antigo não corresponde mais
+            s.pop("mind_img", None)
+        stage = "imagem"
+        if intent == "image":
+            mind = s.get("mind") or {}
+            if not mind.get("outline"):
+                raise RuntimeError("Gere o mapa mental antes de estilizar a imagem.")
+            if box:
+                box.update(label=copy.STEP_IMAGEM)
+            png, meta = image_provider.generate(
+                outline_to_prompt(mind["outline"]), use_cache=use_cache and not force)
+            s["mind_img"] = {"path": str(png), "model": meta.get("model"),
+                             "cost": meta.get("cost"),
+                             "cached": bool(meta.get("cached"))}
     except (RuntimeError, ValueError) as e:
         s["ui_error"] = {"stage": stage, "msg": str(e)}
 
@@ -478,6 +503,55 @@ with ph_p1.container(border=True, key="gdl_card_p1"):
             st.caption(copy.P1_EMPTY)
             st.button(copy.BTN_GEN_P1, width="stretch", key="gen_p1",
                       disabled=not has_sources, on_click=_queue, args=("pass1",))
+
+# mapa mental (M0: SVG determinístico, US$ 0)
+mind = st.session_state.get("mind")
+if config.MINDMAP_ENABLED:
+    with ph_map.container(border=True, key="gdl_card_map"):
+        st.markdown(f"**{copy.MINDMAP_TITLE}**")
+        if not _error_card("mapa"):
+            if mind:
+                st.caption(copy.provenance(mind["provider"], mind["cached"]))
+                st.markdown(mindmap_view.embed(mind["svg"]), unsafe_allow_html=True)
+                url = mindmap_view.publish(mind["svg"], q)
+                if url:
+                    st.link_button(copy.MINDMAP_FULLSCREEN, url, width="stretch")
+                    st.caption(copy.MINDMAP_ZOOM_HINT)
+                else:
+                    st.caption(copy.MINDMAP_STATIC_OFF)
+                mindmap_view.download(mind["svg"])
+                # M1: imagem ilustrada é ADICIONAL — o SVG acima nunca some
+                if not _error_card("imagem"):
+                    img = st.session_state.get("mind_img")
+                    if img and not Path(img.get("path", "")).exists():
+                        img = None
+                    if img:
+                        st.image(img["path"], width="stretch")
+                        cost = img.get("cost")
+                        cost_txt = (f"US$ {cost:.4f}"
+                                    if isinstance(cost, (int, float))
+                                    else "custo não informado")
+                        caption = f"{img.get('model') or ''} · {cost_txt}"
+                        if img.get("cached"):
+                            caption += " · cache"
+                        st.caption(caption)
+                        st.button(copy.MINDMAP_IMAGE_REGEN, key="regen_img",
+                                  width="stretch", on_click=_queue,
+                                  args=("image", True))
+                    elif image_provider.enabled():
+                        st.button(copy.MINDMAP_STYLE_BTN, key="style_img",
+                                  width="stretch", on_click=_queue, args=("image",),
+                                  help=copy.MINDMAP_STYLE_HELP.format(
+                                      model=config.IMAGE_MODEL))
+                    else:
+                        st.caption(copy.MINDMAP_IMAGE_OFF)
+                if mind.get("provider") == "heuristic":
+                    st.warning(copy.MINDMAP_HEURISTIC)
+                _regen_button("regen_map", "map")
+            else:
+                st.caption(copy.MINDMAP_SUBTITLE)
+                st.button(copy.MINDMAP_BTN, width="stretch", key="gen_map",
+                          disabled=not has_sources, on_click=_queue, args=("map",))
 
 # roteiro falado
 p2 = st.session_state.get("pass2")

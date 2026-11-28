@@ -58,6 +58,14 @@ def env_float(name: str, default: float | None = None) -> float | None:
         return default
 
 
+def env_bool(name: str, default: bool) -> bool:
+    """Booleano do ambiente: 1/true/yes/on (case-insensitive); resto = default."""
+    raw = env_str(name)
+    if raw is None:
+        return default
+    return raw.lower() in {"1", "true", "yes", "on"}
+
+
 # -- contexto / geração -------------------------------------------------------
 CHUNK_CHARS = env_int("CHUNK_CHARS", 4500)          # corte por chunk no prompt (Pass1)
 MAX_TOKENS = env_int("MAX_TOKENS", 2500)            # teto de saída Pass1/Pass2
@@ -102,6 +110,36 @@ TREE_PROMPT = _tree_prompt()  # v1 = prompt antigo exato (A/B com cache tree_sel
 # -- TTS ----------------------------------------------------------------------
 TTS_MAX_CHARS = env_int("TTS_MAX_CHARS", 15000)   # trava de custo do premium
 TTS_SLICE_CHARS = env_int("TTS_SLICE_CHARS", 2500)  # alvo por request/fatia
+
+# -- mapa mental (M0: outline JSON + SVG determinístico, US$ 0) ----------------
+MINDMAP_ENABLED = env_bool("MINDMAP_ENABLED", True)   # card + botão na UI
+MINDMAP_MAX_BRANCHES = env_int("MINDMAP_MAX_BRANCHES", 5)  # nós de 1º nível
+MINDMAP_MAX_DEPTH = env_int("MINDMAP_MAX_DEPTH", 2)  # 2 = título → ramo → filho
+MINDMAP_LABEL_CHARS = env_int("MINDMAP_LABEL_CHARS", 40)  # corte de rótulo
+MINDMAP_VERSION = env_str("MINDMAP_VERSION", "v1")   # bust do outline em cache
+
+
+def _mindmap_reasoning() -> str:
+    """`reasoning.effort` do outline: default `none`; `""`/`off` = não enviar.
+
+    Lê o ambiente cru de propósito: aqui `""` significa "desligado", não "default".
+    """
+    raw = os.getenv("MINDMAP_REASONING")
+    return "none" if raw is None else raw.strip()
+
+
+MINDMAP_REASONING = _mindmap_reasoning()  # ex. none|minimal|low|medium|high|off
+
+# -- mapa mental M1: render generativo (OpenRouter Images) --------------------
+# `IMAGE_MODEL` vazio = renderer desligado (R$ 0 preservado; botão "Estilizar" some).
+IMAGE_MODEL = env_str("IMAGE_MODEL", "")
+IMAGE_QUALITY = env_str("IMAGE_QUALITY", "medium")      # só p/ modelos com o knob
+IMAGE_ASPECT = env_str("IMAGE_ASPECT", "4:3")
+IMAGE_RESOLUTION = env_str("IMAGE_RESOLUTION", "1K")    # vazio = não enviar
+IMAGE_MAX_LABELS = env_int("IMAGE_MAX_LABELS", 12)      # nós no prompt (título conta; 0 = sem teto)
+IMAGE_TIMEOUT = env_int("IMAGE_TIMEOUT", 180)           # timeout por request (s)
+IMAGE_RETRIES = env_int("IMAGE_RETRIES", 1)             # tentativas EXTRAS (429/5xx/timeout)
+IMAGE_VERSION = env_str("IMAGE_VERSION", "v1")          # bust do cache de imagens
 
 # -- LLM ----------------------------------------------------------------------
 LLM_TIMEOUT = env_int("LLM_TIMEOUT", 120)   # timeout por request (s)

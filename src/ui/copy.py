@@ -56,6 +56,27 @@ PASS1_TITLE = "RESUMO TÉCNICO"
 PASS2_TITLE = "ROTEIRO FALADO"
 AUDIO_TITLE = "ÁUDIO"
 
+# -- M0: mapa mental (seção do card do Pass1) ---------------------------------
+MINDMAP_TITLE = "MAPA MENTAL"
+MINDMAP_SUBTITLE = "Organização visual do resumo técnico"
+MINDMAP_BTN = "Gerar mapa mental"
+MINDMAP_REGEN = "↻ Regerar mapa"
+MINDMAP_SPINNER = "Montando mapa…"
+MINDMAP_ERROR = "O mapa mental não foi gerado."
+MINDMAP_HEURISTIC = "Mapa gerado sem LLM; rótulos extraídos do resumo."
+MINDMAP_FULLSCREEN = "⛶ Ver em tela cheia"
+MINDMAP_DOWNLOAD = "Baixar SVG"
+MINDMAP_ZOOM_HINT = "Abre em nova aba, ocupa a tela e tem zoom próprio."
+MINDMAP_STATIC_OFF = "O mapa rola no card; baixe o SVG para ampliar."
+
+# -- M1: imagem generativa (botão "Estilizar"; paga por imagem) ---------------
+MINDMAP_STYLE_BTN = "🎨 Estilizar com IA"
+MINDMAP_STYLE_HELP = ("Gera uma versão ilustrada do mapa com {model}. "
+                      "Custo estimado ≈US$ 0,08 por imagem.")
+MINDMAP_IMAGE_REGEN = "↻ Regerar imagem"
+MINDMAP_IMAGE_OFF = "Defina IMAGE_MODEL no .env para gerar a versão ilustrada."
+MINDMAP_IMAGE_ERROR = "A versão ilustrada não foi gerada."
+
 NEW_QUESTION = "↺ Nova pergunta"
 RETRY = "Tentar de novo"
 DETAILS = "Detalhes"
@@ -94,11 +115,15 @@ SEARCH_FAILED = "A busca falhou"
 STEP_RESUMO = "Escrevendo o resumo…"
 STEP_ROTEIRO = "Adaptando para fala…"
 STEP_AUDIO = "Sintetizando o áudio…"
+STEP_MAPA = MINDMAP_SPINNER
+STEP_IMAGEM = "Desenhando a versão ilustrada…"
 RUN_LABEL = {
     "listen": "Preparando o áudio…",
     "pass1": "Escrevendo o resumo…",
     "pass2": "Escrevendo o roteiro…",
     "audio": "Sintetizando o áudio…",
+    "map": MINDMAP_SPINNER,
+    "image": STEP_IMAGEM,
 }
 RUN_DONE = "Pronto"
 RUN_FAILED = "Falhou"
@@ -109,14 +134,18 @@ STAGE_ERROR = {
     "resumo": "O resumo técnico não foi gerado.",
     "roteiro": "O roteiro falado não foi gerado.",
     "audio": "O áudio não foi gerado.",
+    "mapa": MINDMAP_ERROR,
+    "imagem": MINDMAP_IMAGE_ERROR,
 }
-STAGE_RETRY = {"fontes": "pass1", "resumo": "pass1", "roteiro": "pass2", "audio": "audio"}
+STAGE_RETRY = {"fontes": "pass1", "resumo": "pass1", "roteiro": "pass2",
+               "audio": "audio", "mapa": "map", "imagem": "image"}
 
 # Rótulos humanos de provider: nada de `openrouter/free` ou `opencode-subprocess` na tela.
 _PROVIDER_LABELS = {
     "gemini": "Gemini",
     "openrouter": "OpenRouter",
     "opencode-subprocess": "local",
+    "heuristic": "heurístico",
 }
 
 
