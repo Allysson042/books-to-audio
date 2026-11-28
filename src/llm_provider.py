@@ -9,7 +9,9 @@ class LLMProvider(ABC):
     name = "base"
 
     @abstractmethod
-    def complete(self, system: str, user: str, max_tokens: int = 1500) -> str:
+    def complete(self, system: str, user: str, max_tokens: int = 1500,
+                 extra: dict | None = None) -> str:
+        """`extra` é payload específico do provider (ex. `reasoning`); base ignora."""
         ...
 
 
@@ -35,8 +37,9 @@ class GeminiProvider(LLMProvider):
             self._models[system] = model
         return model
 
-    def complete(self, system: str, user: str, max_tokens: int = 1500) -> str:
-        gen_cfg = {}
+    def complete(self, system: str, user: str, max_tokens: int = 1500,
+                 extra: dict | None = None) -> str:
+        gen_cfg = {}  # `extra` é contrato do OpenRouter; Gemini ignora de propósito.
         if max_tokens:  # None/0 = deixa o default do modelo (comportamento antigo)
             gen_cfg["max_output_tokens"] = int(max_tokens)
         if config.LLM_TEMPERATURE is not None:
@@ -71,21 +74,39 @@ class OpenRouterProvider(LLMProvider):
         self.model = model
         self.model_name = model
 
-    def complete(self, system: str, user: str, max_tokens: int = 1500) -> str:
+    def complete(self, system: str, user: str, max_tokens: int = 1500,
+                 extra: dict | None = None) -> str:
         import httpx
-        payload = {"model": self.model, "max_tokens": max_tokens, "messages": [
+        base = {"model": self.model, "max_tokens": max_tokens, "messages": [
             {"role": "system", "content": system},
             {"role": "user", "content": user}]}
         if config.LLM_TEMPERATURE is not None:  # só envia se setado
-            payload["temperature"] = config.LLM_TEMPERATURE
-        r = httpx.post(self.URL, timeout=config.LLM_TIMEOUT, headers={
+            base["temperature"] = config.LLM_TEMPERATURE
+        payload = dict(base)
+        payload.update(extra or {})  # ex. reasoning={"effort": "none"}
+        headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
             "HTTP-Referer": "https://github.com/books-to-audio",
             "X-Title": "Books to Audio (seminario)",
-        }, json=payload)
+        }
+        r = httpx.post(self.URL, timeout=config.LLM_TIMEOUT, headers=headers, json=payload)
+        if extra and r.status_code in (400, 422):
+            # Modelo não aceita o payload opcional: repete UMA vez sem `extra`
+            # (não pode derrubar o fluxo nem mascarar um 400 legítimo do resto).
+            print(f"[llm-call] openrouter model={self.model} recusou extra "
+                  f"({r.status_code}) — repetindo sem extra", flush=True)
+            payload = dict(base)
+            r = httpx.post(self.URL, timeout=config.LLM_TIMEOUT, headers=headers,
+                           json=payload)
         r.raise_for_status()
-        msg = r.json()["choices"][0]["message"]
+        choice = r.json()["choices"][0]
+        # Truncamento silencioso: content pode vir vazio OU cortado no meio do JSON.
+        # Falha ANTES de usar o texto p/ o fallback assumir (nunca servir cortado).
+        if choice.get("finish_reason") == "length":
+            raise RuntimeError(
+                f"OpenRouter ({self.model}) truncou a resposta (finish_reason=length)")
+        msg = choice["message"]
         # Modelos reasoning devolvem o pensamento em `reasoning` e a resposta em `content`.
         # Usa SÓ content (pensamento nunca vaza p/ tela); se vazio, falha p/ fallback.
         # (reasoning exclude:true quebra este modelo — content volta vazio. Não usar.)
@@ -100,8 +121,9 @@ class OpenCodeSubprocessProvider(LLMProvider):
     name = "opencode-subprocess"
     model_name = "opencode run"
 
-    def complete(self, system: str, user: str, max_tokens: int = 1500) -> str:
-        import subprocess, textwrap
+    def complete(self, system: str, user: str, max_tokens: int = 1500,
+                 extra: dict | None = None) -> str:
+        import subprocess, textwrap  # `extra` não tem efeito via `opencode run`
         prompt = textwrap.shorten(f"{system}\n\n{user}", width=config.LLM_PROMPT_CHARS)
         out = subprocess.run(["opencode", "run", prompt], capture_output=True, text=True,
                              timeout=config.LLM_TIMEOUT)
@@ -187,8 +209,13 @@ def _is_retryable(exc: Exception) -> bool:
 
 
 def complete_with_fallback(system: str, user: str, max_tokens: int = 1500,
-                           chain: list[LLMProvider] | None = None) -> tuple[str, str]:
+                           chain: list[LLMProvider] | None = None,
+                           extra: dict | None = None) -> tuple[str, str]:
     """Tenta cada provider em ordem; retorna (texto, nome_do_provider). Erro claro se todos falharem.
+
+    `extra` (opcional) é repassado a cada provider: payload específico, ex.
+    `{"reasoning": {"effort": "none"}}` no OpenRouter. `GeminiProvider`/
+    `OpenCodeSubprocessProvider` aceitam e ignoram.
 
     Retry por provider: `config.LLM_RETRIES` tentativas extras, backoff 2s/5s, só em
     erro transitório (timeout/conexão/5xx/429). 401/403 e resposta vazia caem direto
@@ -206,7 +233,7 @@ def complete_with_fallback(system: str, user: str, max_tokens: int = 1500,
         for attempt in range(1, attempts + 1):
             t0 = time.time()
             try:
-                text = p.complete(system, user, max_tokens)
+                text = p.complete(system, user, max_tokens, extra=extra)
                 # Log p/ o terminal do servidor: visível em `streamlit run` e em scripts.
                 print(f"[llm-call] provider={p.name} model={model} "
                       f"in={in_chars}ch(~{in_chars//4}tok) out={len(text)}ch(~{len(text)//4}tok) "
